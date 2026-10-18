@@ -1,0 +1,44 @@
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", "docs/**", "src/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+      - run: uv venv && uv pip install .
+      - name: Live demo report
+        run: |
+          python docs/demo_repo.py "$RUNNER_TEMP/shop"
+          cd "$RUNNER_TEMP/shop"
+          "$GITHUB_WORKSPACE/.venv/bin/crgraph" main...feature/quick-buy -o "$GITHUB_WORKSPACE/_site/demo" --fail-on never
+      - run: cp -R site/. _site/ && mkdir -p _site/images && cp docs/images/*.png _site/images/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

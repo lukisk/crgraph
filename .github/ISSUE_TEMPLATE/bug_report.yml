@@ -1,0 +1,27 @@
+name: Bug report
+description: crgraph crashed, missed something, or reported something wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected and what you got. Please don't paste private source code.
+    validations: { required: true }
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      placeholder: crgraph main...feature -g
+  - type: input
+    id: version
+    attributes:
+      label: crgraph version, OS and Python
+      placeholder: crgraph 0.1.0, macOS 15, Python 3.13
+    validations: { required: true }
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language of the repository
+      multiple: true
+      options: [Kotlin, Swift, TypeScript / JavaScript, Python, other]

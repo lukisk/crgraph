@@ -1,0 +1,9 @@
+.superpowers/
+crgraph-out/
+__pycache__/
+.venv/
+*.egg-info/
+dist/
+.DS_Store
+tmp/
+.claude/settings.local.json
