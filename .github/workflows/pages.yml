@@ -28,7 +28,7 @@ jobs:
           cd "$RUNNER_TEMP/shop"
           "$GITHUB_WORKSPACE/.venv/bin/crgraph" main...feature/quick-buy -o "$GITHUB_WORKSPACE/_site/demo" --fail-on never
       - run: cp -R site/. _site/ && mkdir -p _site/images && cp docs/images/*.png _site/images/
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v4
         with:
           path: _site
