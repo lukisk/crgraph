@@ -27,7 +27,7 @@ classifiers = [
 ]
 dependencies = [
   # tree-sitter 0.26.0 segfaults in Node.text/start_byte under Python 3.14; 0.25.2 is verified
-  "tree-sitter==0.25.2",
+  "tree-sitter==0.26.0",
   "tree-sitter-language-pack==1.22.1",
   "pyyaml>=6.0",
   "anthropic>=1.14,<2",
