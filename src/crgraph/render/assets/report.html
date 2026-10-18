@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<style>/*{{CSS}}*/</style>
+</head>
+<body>
+<header id="top">
+  <div class="headline">
+    <span class="brand">crgraph</span>
+    <code id="range"></code>
+    <span id="counts"></span>
+    <button id="btn-story" type="button" aria-pressed="false">Story view</button>
+  </div>
+  <div id="verdict" hidden></div>
+  <details id="explain" hidden><summary>Summary</summary><p id="explain-text"></p></details>
+  <details id="warnings" hidden><summary id="warnings-summary"></summary><ul id="warnings-list"></ul></details>
+</header>
+<main id="app">
+  <aside id="findings" aria-label="Findings"></aside>
+  <section id="center" aria-label="Architecture graph">
+    <div id="toolbar">
+      <div class="seg" role="group" aria-label="Graph state">
+        <button type="button" data-mode="before">Before</button><button type="button" data-mode="merged">Merged</button><button type="button" data-mode="after">After</button>
+      </div>
+      <div class="seg" role="group" aria-label="Expand to">
+        <button type="button" data-depth="module">Modules</button><button type="button" data-depth="file">Files</button><button type="button" data-depth="symbol">Symbols</button>
+      </div>
+      <label class="check"><input type="checkbox" id="focus" checked> Changed + 1 hop</label>
+      <span id="status-filters" role="group" aria-label="Status filter"></span>
+      <input id="search" type="search" placeholder="Find a name…" aria-label="Find a name">
+    </div>
+    <div id="cy"></div>
+    <details id="legend">
+      <summary>Legend</summary>
+      <h4>Lines — the arrow points to what is used</h4>
+      <ul>
+        <li><svg viewBox="0 0 44 10"><line x1="2" y1="5" x2="34" y2="5" style="stroke:var(--st-unchanged)" stroke-width="1.4"/><polygon points="34,1 42,5 34,9" style="fill:var(--st-unchanged)"/></svg>A uses B, unchanged</li>
+        <li><svg viewBox="0 0 44 10"><line x1="2" y1="5" x2="34" y2="5" style="stroke:var(--st-added)" stroke-width="2.6"/><polygon points="34,1 42,5 34,9" style="fill:var(--st-added)"/></svg>new: did not exist before this change</li>
+        <li><svg viewBox="0 0 44 10"><line x1="2" y1="5" x2="34" y2="5" style="stroke:var(--st-modified)" stroke-width="2.2"/><polygon points="34,1 42,5 34,9" style="fill:var(--st-modified)"/></svg>changed: existed before; this change adds or removes connections inside it</li>
+        <li><svg viewBox="0 0 44 10"><line x1="2" y1="5" x2="34" y2="5" style="stroke:var(--st-removed)" stroke-width="2" stroke-dasharray="1 3"/><polygon points="34,1 42,5 34,9" style="fill:var(--st-removed)"/></svg>removed: no longer exists after this change</li>
+        <li><svg viewBox="0 0 44 10"><line x1="2" y1="5" x2="34" y2="5" style="stroke:var(--st-unchanged)" stroke-width="1.4" stroke-dasharray="5 3"/><polygon points="34,1 42,5 34,9" style="fill:var(--st-unchanged)"/></svg>matched by name only (no exact import)</li>
+        <li><svg viewBox="0 0 44 10"><line x1="2" y1="5" x2="34" y2="5" style="stroke:var(--danger)" stroke-width="3.4"/><polygon points="34,1 42,5 34,9" style="fill:var(--danger)"/></svg>part of a finding (cycle, rule)</li>
+      </ul>
+      <h4>Kinds — one line can bundle several; click it to see them</h4>
+      <dl>
+        <dt>depends on</dt><dd>module dependency declared in a build file</dd>
+        <dt>imports</dt><dd>a file imports another file</dd>
+        <dt>calls</dt><dd>a function calls a function</dd>
+        <dt>references</dt><dd>code uses a type, property or constant</dd>
+        <dt>inherits</dt><dd>a type extends or implements another</dd>
+      </dl>
+      <h4>Boxes</h4>
+      <ul class="boxes">
+        <li><span class="swatch" style="border-color:var(--st-added);background:var(--st-added-bg)"></span>added</li>
+        <li><span class="swatch" style="border-color:var(--st-modified);background:var(--st-modified-bg)"></span>modified</li>
+        <li><span class="swatch" style="border-color:var(--st-removed);background:var(--st-removed-bg)"></span>removed</li>
+        <li><span class="swatch" style="border-color:var(--st-moved);background:var(--st-moved-bg)"></span>moved</li>
+        <li><span class="swatch dashed" style="border-color:var(--st-impacted);background:var(--st-impacted-bg)"></span>impacted: unchanged, but uses changed code</li>
+        <li><span class="swatch" style="border-color:var(--st-unchanged);background:var(--st-unchanged-bg)"></span>unchanged</li>
+        <li>module ⊃ file ⊃ class/function: double-click a box to open it</li>
+        <li>dashed frame: modules from the same top-level folder</li>
+      </ul>
+      <h4>Hidden to reduce clutter</h4>
+      <ul>
+        <li>an unchanged module dependency A → C when A → B → C is drawn</li>
+      </ul>
+    </details>
+    <div id="hint">Click a node or a line for details · double-click to expand or collapse · click a finding to locate it</div>
+  </section>
+  <aside id="details" aria-label="Details"><p class="muted">Select a node or a finding.</p></aside>
+</main>
+<article id="story" hidden></article>
+<script type="application/json" id="crgraph-data">{{DATA}}</script>
+<script>/*{{CYTOSCAPE}}*/</script>
+<script>/*{{CYTOSCAPE_DAGRE}}*/</script>
+<script>/*{{APP}}*/</script>
+</body>
+</html>
