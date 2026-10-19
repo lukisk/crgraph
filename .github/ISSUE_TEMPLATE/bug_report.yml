@@ -17,7 +17,7 @@ body:
     id: version
     attributes:
       label: crgraph version, OS and Python
-      placeholder: crgraph 0.4.0, macOS 15, Python 3.13
+      placeholder: crgraph 0.4.1, macOS 15, Python 3.13
     validations: { required: true }
   - type: dropdown
     id: language

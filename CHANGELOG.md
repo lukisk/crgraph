@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.1
 
 - Report: the closed legend no longer covers the hint line when it wraps.
 - `--explain`: the review never quotes JSON field names.
