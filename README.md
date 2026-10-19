@@ -248,6 +248,8 @@ explain: { model: claude-opus-5-5, include_signatures: true, plain: false }
 cohesion, SOLID, DRY, testability, API compatibility, the top risks and concrete suggestions. Every line names
 the modules, types or numbers it is based on.
 
+![AI review of the demo change: verdict Needs work, then one line each on architecture, coupling, SOLID, DRY, testability, API, risks and suggestions](docs/images/review.png)
+
 The model never sees code. It gets module, file and symbol names, statuses, signatures, sizes, complexity,
 dependency changes, the overview and the findings, plus a hint about new types whose name already exists
 elsewhere (possible duplication). Where the structure cannot show something, the review says so instead of

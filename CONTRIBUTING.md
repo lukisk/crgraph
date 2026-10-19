@@ -51,13 +51,19 @@ that module's `CHECKS`, add the rule to the table in `README.md`, and give it a 
 ## Screenshots
 
 `docs/demo_repo.py` builds a small Kotlin demo repository with a reviewable change, and
-`docs/screenshots.py` regenerates the images in `docs/images/` from its report (it needs Google Chrome):
+`docs/screenshots.py` regenerates the images in `docs/images/` from its report (it needs Google Chrome).
+`docs/demo-review.txt` is a saved `--explain` review of that change; `docs/add_review.py` adds it to a report, so
+the screenshots and the live demo show a review without an API key:
 
 ```sh
 python docs/demo_repo.py /tmp/shop
 (cd /tmp/shop && crgraph main...feature/quick-buy -o /tmp/shop-out --fail-on never)
+.venv/bin/python docs/add_review.py /tmp/shop-out docs/demo-review.txt
 .venv/bin/python docs/screenshots.py /tmp/shop-out/report.html docs/images
 ```
+
+To refresh the saved review, run the second step with `--explain --format json` and copy `explain` from
+`delta.json` into `docs/demo-review.txt`.
 
 ## Project site
 

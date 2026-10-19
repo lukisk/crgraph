@@ -172,8 +172,22 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; }
         <div class="card"><h3>Where to start</h3><p>A verdict, a review size from S to XL, a per-module table, and the five files to read first, each with its reasons.</p></div>
         <div class="card"><h3>Click to trace</h3><p>Click a box to highlight everything it connects to. Click a line to see which code creates that dependency.</p></div>
         <div class="card"><h3>Ready for CI</h3><p>Exit codes for red or yellow findings, a summary for GitHub and GitLab, and rules in <code>.crgraph.yml</code> read from the base revision.</p></div>
+        <div class="card"><h3>AI architecture review</h3><p>With <code>--explain</code>, a model gives a verdict on the change and checks coupling, SOLID, DRY and testability against the facts in the graph.</p></div>
         <div class="card"><h3>Local and private</h3><p>No server and no build. The report holds names, paths, signatures and metrics, never source code.</p></div>
       </div>
+    </div>
+  </section>
+
+  <section id="review">
+    <div class="wrap">
+      <h2>An architecture verdict</h2>
+      <p class="sub">Add <code>--explain</code> and a model reviews the change like an architect would: <b>Good</b>,
+        <b>Acceptable</b> or <b>Needs work</b>, then architecture, coupling and cohesion, SOLID, DRY, testability and API
+        compatibility, each based on names and numbers from the change. It sees the structure, never the code, and works
+        with the Anthropic API or your own LLM proxy.</p>
+      <div class="shot"><a href="demo/report.html"><img src="images/review.png" width="1016" height="524"
+        alt="AI review of the demo change: verdict Needs work, then one line each on architecture, coupling, SOLID, DRY, testability, API, risks and suggestions"></a></div>
+      <p class="caption">The review <code>--explain</code> wrote for the demo change. In the report, the ✦ verdict button opens it.</p>
     </div>
   </section>
 

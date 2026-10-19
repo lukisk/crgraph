@@ -31,7 +31,7 @@ changed with the code, test share of new lines, complexity, injectable dependenc
 
 Base every statement on facts in the JSON and name the modules, types or numbers you rely on. Never guess about \
 code you cannot see: when the structure does not show something, say "not visible from structure" and move on. Be \
-direct and specific; no generic advice.
+direct and specific; no generic advice. Write for a human reviewer: never mention the JSON or its field names.
 
 Answer with exactly these lines, in this order, each at most two sentences, plain text without markdown:
 {chr(10).join(f"{label}: ..." for label in LABELS)}

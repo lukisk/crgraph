@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Report: the closed legend no longer covers the hint line when it wraps.
+- `--explain`: the review never quotes JSON field names.
+
 ## 0.4.0
 
 - `--explain` is now an architecture review: a verdict (Good / Acceptable / Needs work) with the reason, then

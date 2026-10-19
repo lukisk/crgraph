@@ -793,6 +793,10 @@
   document.getElementById("btn-story").addEventListener("click", toggleStory);
   document.getElementById("btn-theme").addEventListener("click", toggleTheme);
   document.getElementById("btn-review").addEventListener("click", openReview);
+  // the legend sits just above the hint line, which wraps to two lines on narrower windows
+  new ResizeObserver(function () {
+    document.getElementById("legend").style.bottom = document.getElementById("hint").offsetHeight + "px";
+  }).observe(document.getElementById("hint"));
   darkQuery.addEventListener("change", function () { if (!document.documentElement.dataset.theme) applyTheme(null); });
   document.getElementById("focus").addEventListener("change", function (ev) { state.focus = ev.target.checked; render(true); });
   document.getElementById("tests").addEventListener("change", function (ev) { state.tests = ev.target.checked; render(false); });
