@@ -133,12 +133,19 @@ def check_rule_violations(ctx: AnalysisContext) -> list[Finding]:
     return findings
 
 
+IMPORT_ONLY_SYSTEMS = frozenset({"go", "php", "fallback", "config"})
+
+
 def check_module_deps(ctx: AnalysisContext) -> list[Finding]:
     before, after = _pairs(ctx, "depends_on", "before"), _pairs(ctx, "depends_on", "after")
     derived = {(e.src, e.dst) for e in ctx.delta.edges if e.kind == "depends_on" and e.derived}
     findings = []
     for src, dst in sorted(after - before):
-        via = " (via imports, not declared in a build file)" if (src, dst) in derived else ""
+        via = ""
+        if (src, dst) in derived:  # Go packages, PHP namespaces and folders only ever depend through imports
+            info = ctx.mods_after.modules.get(ctx.delta.nodes[src].module or "") if src in ctx.delta.nodes else None
+            via = " (via imports)" if info is None or info.system in IMPORT_ONLY_SYSTEMS else \
+                " (via imports, not declared in a build file)"
         findings.append(Finding("module-dep-added", Severity.YELLOW,
                                 f"New dependency {_name(ctx, src)} → {_name(ctx, dst)}{via}", "",
                                 [src, dst, edge_id(src, dst, "depends_on")]))

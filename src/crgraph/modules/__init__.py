@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from ..config import Config
 from ..globs import match_any
-from . import gradle, npm, python, swift
+from . import golang, gradle, npm, php, python, swift
 from .model import ModuleInfo, ModuleMap, Reader
 
-DETECTORS = (gradle.detect, swift.detect, npm.detect, python.detect)
+DETECTORS = (gradle.detect, swift.detect, npm.detect, python.detect, golang.detect, php.detect)
 
 
 def detect_modules(files: list[str], read: Reader, config: Config) -> ModuleMap:

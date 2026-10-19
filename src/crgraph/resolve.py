@@ -33,6 +33,7 @@ class RepoIndex:
         self.modules = modules
         self._package_lines = package_lines
         self._kotlin: dict[str, set[str]] | None = None
+        self._by_dir: dict[str, set[str]] | None = None
         self._py_roots = sorted({""} | {r for m in modules.modules.values() if m.system == "python"
                                         for r in (m.root, f"{m.root}/src".lstrip("/"))})
 
@@ -46,8 +47,8 @@ class RepoIndex:
         return self._kotlin.get(package, set())
 
     def resolve(self, facts: FileFacts) -> list[ImportTarget]:
-        resolver = {"kotlin": self._kotlin_import, "swift": self._swift_import,
-                    "typescript": self._ts_import, "python": self._py_import}.get(facts.lang)
+        resolver = {"kotlin": self._kotlin_import, "swift": self._swift_import, "typescript": self._ts_import,
+                    "python": self._py_import, "go": self._go_import, "php": self._php_import}.get(facts.lang)
         if resolver is None:
             return []
         targets = [t for t in (resolver(raw, facts) for raw in facts.imports) if t is not None]
@@ -90,6 +91,32 @@ class RepoIndex:
         if info is None or info.system != "npm":
             return None
         return ImportTarget(raw, frozenset(), frozenset({name}))
+
+    def _files_in(self, directory: str, suffix: str) -> set[str]:
+        if self._by_dir is None:
+            self._by_dir = {}
+            for f in self.files:
+                self._by_dir.setdefault(posixpath.dirname(f), set()).add(f)
+        return {f for f in self._by_dir.get(directory, set()) if f.endswith(suffix)}
+
+    def _go_import(self, raw: str, facts: FileFacts) -> ImportTarget | None:
+        """An import path names a package directory (module id); it depends on all of that package's files."""
+        info = self.modules.modules.get(raw)
+        if info is None or info.system != "go":
+            return None  # the standard library or another module
+        files = {f for f in self._files_in(info.root, ".go") if not f.endswith("_test.go")}
+        return ImportTarget(raw, frozenset(files), frozenset({raw}))
+
+    def _php_import(self, raw: str, facts: FileFacts) -> ImportTarget | None:
+        """PSR-4: `App\\Service\\Checkout` is Checkout.php in the directory of namespace module App\\Service."""
+        namespace, _, name = raw.rpartition("\\")
+        info = self.modules.modules.get(namespace)
+        if info is None or info.system != "php":
+            return None
+        path = f"{info.root}/{name}.php" if info.root else f"{name}.php"
+        if path in self.files:
+            return self._target(raw, {path})
+        return ImportTarget(raw, frozenset(), frozenset({namespace}))  # a function or constant: the namespace
 
     def _py_import(self, raw: str, facts: FileFacts) -> ImportTarget | None:
         if raw.startswith("."):

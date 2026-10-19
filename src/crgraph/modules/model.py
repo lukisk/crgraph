@@ -28,7 +28,7 @@ def join(base: str, rel: str) -> str:
 class ModuleInfo:
     id: str
     root: str  # directory relative to the repo root; "" is the repo root
-    system: str  # gradle|swiftpm|swift|npm|python|config|fallback
+    system: str  # gradle|swiftpm|swift|npm|python|go|composer|php|config|fallback
 
 
 @dataclass

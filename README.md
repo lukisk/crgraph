@@ -20,7 +20,7 @@ A line diff tells you *what text* changed. crgraph tells you *what the change me
 - four modules changed code without touching their tests
 
 It runs locally on any git repository, needs no server and no build, and works on Kotlin, Swift,
-TypeScript/JavaScript and Python.
+TypeScript/JavaScript, Python, Go and PHP.
 
 ## Install
 
@@ -34,7 +34,7 @@ pipx install git+https://github.com/lukisk/crgraph
 ```
 
 To upgrade, run `uv tool upgrade crgraph` (or `pipx upgrade crgraph`). To pin a release, append it to the URL:
-`git+https://github.com/lukisk/crgraph@v0.4.1`.
+`git+https://github.com/lukisk/crgraph@v0.5.0`.
 
 Language grammars download on first use. For CI images or offline machines, run `crgraph grammars fetch` once.
 
@@ -162,7 +162,7 @@ flowchart LR
 | `coupling-increase` | 🟡 | a module's outgoing dependencies grew a lot |
 | `complexity` | 🟡 | a function's complexity jumped or crossed the ceiling |
 | `test-gap` | 🟡 | changed code without matching test changes |
-| `external-dep-added` | 🟡 | a new Gradle, SwiftPM, npm or pip dependency |
+| `external-dep-added` | 🟡 | a new Gradle, SwiftPM, npm, pip, Go or Composer dependency |
 | `contract-surface` | 🟡 | manifests, plists, migrations, env vars or HTTP routes changed |
 | `analysis-config` | 🟡 | the change edits `.crgraph.yml` (findings still use the base version) |
 | `blast-radius` | ⚪/🟡 | unchanged code in other modules that uses changed code |
@@ -185,7 +185,7 @@ crgraph:
     - uses: actions/checkout@v5
       with: { fetch-depth: 0 }
     - uses: astral-sh/setup-uv@v7
-    - run: uv tool install git+https://github.com/lukisk/crgraph@v0.4.1
+    - run: uv tool install git+https://github.com/lukisk/crgraph@v0.5.0
     - run: crgraph origin/${{ github.base_ref }}...HEAD -g --fail-on never
     - run: cat crgraph-out/summary.md >> "$GITHUB_STEP_SUMMARY"
     - uses: actions/upload-artifact@v4
@@ -200,7 +200,7 @@ crgraph:
   rules: [{ if: $CI_MERGE_REQUEST_IID }]
   variables: { GIT_DEPTH: 0 }
   script:
-    - uv tool install git+https://github.com/lukisk/crgraph@v0.4.1
+    - uv tool install git+https://github.com/lukisk/crgraph@v0.5.0
     - ~/.local/bin/crgraph origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD -g --fail-on red
   artifacts: { when: always, paths: [crgraph-out/], expose_as: crgraph report }
 ```
@@ -284,7 +284,10 @@ explain:
 ## How it works
 
 1. **Modules** come from build files: Gradle settings and build scripts, `Package.swift` or
-   `<Module>/Sources/` folders, `package.json` (including workspaces) and `pyproject.toml`.
+   `<Module>/Sources/` folders, `package.json` (including workspaces), `pyproject.toml`, `go.mod` and
+   `composer.json`. In Go every package directory is a module named by its import path; in PHP every directory
+   under a PSR-4 autoload root is a module named by its namespace (`App\Service`), so imports resolve to files.
+   Files outside any of these are grouped by folder.
 2. **Files** changed in the range are parsed on both sides with [tree-sitter](https://tree-sitter.github.io/):
    classes, functions, signatures, visibility, complexity and imports.
 3. **Dependencies** are resolved from imports and names, then extended one hop to the unchanged code that uses

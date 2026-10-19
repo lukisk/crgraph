@@ -28,6 +28,7 @@ PERMISSION = re.compile(r"<uses-permission[^>]*android:name=\"([^\"]+)\"")
 PLIST_KEY = re.compile(r"<key>([^<]+)</key>")
 NEXT_ROUTE = re.compile(r"(^|/)app/(.+/)?route\.(ts|js)$")
 CHANGED = (Status.ADDED, Status.MODIFIED, Status.MOVED)
+MIN_TEST_NAME = 3  # shorter names would match almost any test file
 
 
 def _dec(data: bytes | None) -> str:
@@ -55,11 +56,15 @@ def check_test_gap(ctx: AnalysisContext) -> list[Finding]:
             bucket = tests if match_any(ctx.config.test_patterns, n.path or "") else sources
             bucket[n.module or ""].append(n.path or "")
     findings = []
+    elsewhere = {PurePosixPath(p).stem.lower() for paths in tests.values() for p in paths}
     for module, paths in sorted(sources.items()):
         test_stems = {PurePosixPath(p).stem.lower() for p in tests.get(module, [])}
         types = sorted({n.name for n in ctx.delta.nodes.values()
                         if n.kind in CONTAINER_KINDS and n.name != "Companion" and n.path in paths
                         and n.status in (Status.ADDED, Status.MODIFIED)})
+        # tests kept in their own module (tests/, Tests\...) count when named after this module's code
+        names = {x.lower() for x in [*types, *(PurePosixPath(p).stem for p in paths)] if len(x) >= MIN_TEST_NAME}
+        test_stems |= {stem for stem in elsewhere if any(name in stem for name in names)}
         if not test_stems:
             findings.append(Finding("test-gap", Severity.YELLOW, f"No test changes in {module} ({len(paths)} changed source file(s))",
                                     ", ".join(types), [module_id(module), *(file_id(p) for p in sorted(paths))]))

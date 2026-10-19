@@ -88,7 +88,7 @@
   }
   function shortName(n) {
     if (n.kind !== "module") return n.name;
-    var parts = n.name.split(/[:/]/).filter(Boolean);
+    var parts = n.name.split(/[:/\\]/).filter(Boolean);  // Gradle :a:b, Go import paths, PHP namespaces
     return parts.length > 2 ? "…" + parts.slice(-2).join(":") : n.name;  // full name is in the details panel
   }
   function label(n) {

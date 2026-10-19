@@ -94,7 +94,7 @@ def normalize_signature(raw: str) -> str:
     s = re.sub(r"([(\[<])\s+", r"\1", s)
     s = re.sub(r"\s+([)\]>,:])", r"\1", s)
     s = re.sub(r"(?<!:)([,:])(?=[^\s:])", r"\1 ", s)
-    return s.rstrip(" {=:")[:200]
+    return s.rstrip(" {=:;")[:200]
 
 
 def signature(node: TSNode, body: TSNode | None) -> str:
@@ -199,12 +199,13 @@ class Collector:
         """Record call refs and capitalised identifier refs anywhere under `node`."""
         if node is None:
             return
+        skip = getattr(self.plugin, "skip_ident_parents", frozenset())
         stack = [node]
         while stack:
             cur = stack.pop()
             if cur.type in self.plugin.call_types:
                 self.ref("call", self.plugin.callee_name(cur), scope)
-            elif cur.type in self.plugin.ident_types:
+            elif cur.type in self.plugin.ident_types and (cur.parent is None or cur.parent.type not in skip):
                 name = text(cur)
                 if name[:1].isupper():
                     self.ref("type", name, scope)

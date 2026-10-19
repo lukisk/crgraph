@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0
+
+- Go: functions, methods (grouped under their receiver type), structs, interfaces, constants and imports.
+  Every package directory under a `go.mod` is a module named by its import path, so imports resolve to files and
+  the module graph shows package dependencies. `go.mod` requirements are external dependencies; `*_test.go`
+  files are tests.
+- PHP: classes, interfaces, traits, enums, methods, properties, functions and `use` statements. Every
+  `composer.json` is a module, and every directory under a PSR-4 autoload root is a module named by its
+  namespace. Composer requirements are external dependencies; `*Test.php` files are tests.
+- `test-gap`: tests kept in their own folder or module (`tests/`, `Tests\...`) count for the code they are named
+  after, so Python and PHP changes with tests no longer report a missing test change.
+
 ## 0.4.1
 
 - Report: the closed legend no longer covers the hint line when it wraps.

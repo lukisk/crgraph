@@ -4,16 +4,18 @@ from __future__ import annotations
 from pathlib import PurePosixPath
 
 from .base import LanguagePlugin, parse_source
+from .golang import GoPlugin
 from .kotlin import KotlinPlugin
+from .php import PhpPlugin
 from .python import PythonPlugin
 from .swift import SwiftPlugin
 from .typescript import TypeScriptPlugin
 
-GRAMMARS = ("kotlin", "swift", "typescript", "tsx", "javascript", "python")
+GRAMMARS = ("kotlin", "swift", "typescript", "tsx", "javascript", "python", "go", "php")
 BUILD_FILE_NAMES = frozenset({
     "build.gradle.kts", "settings.gradle.kts", "build.gradle", "settings.gradle", "Package.swift", "Project.swift",
 })
-PLUGINS: list[LanguagePlugin] = [PythonPlugin(), KotlinPlugin(), SwiftPlugin(), TypeScriptPlugin()]
+PLUGINS: list[LanguagePlugin] = [PythonPlugin(), KotlinPlugin(), SwiftPlugin(), TypeScriptPlugin(), GoPlugin(), PhpPlugin()]
 _BY_SUFFIX = {ext: plugin for plugin in PLUGINS for ext in plugin.extensions}
 
 

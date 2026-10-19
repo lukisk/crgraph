@@ -109,3 +109,48 @@ def test_fallback_and_overrides():
 def test_ignored_build_files_are_skipped():
     mm = detect({"build/generated/package.json": '{"name": "gen"}'})
     assert mm.modules == {}
+
+
+def test_go_packages_are_modules_named_by_import_path():
+    mm = detect({
+        "go.mod": """
+            module github.com/acme/shop
+
+            go 1.22
+
+            require (
+            \tgithub.com/stretchr/testify v1.9.0
+            \tgolang.org/x/sync v0.7.0 // indirect
+            )
+            require github.com/google/uuid v1.6.0
+        """,
+        "main.go": "package main",
+        "internal/cart/cart.go": "package cart",
+        "internal/cart/cart_test.go": "package cart",
+        "internal/cart/testdata/fixture.go": "package fixture",
+    })
+    ids = {mid: (info.root, info.system) for mid, info in mm.modules.items()}
+    assert ids == {"github.com/acme/shop": ("", "go"), "github.com/acme/shop/internal/cart": ("internal/cart", "go")}
+    assert mm.module_of("internal/cart/cart_test.go") == "github.com/acme/shop/internal/cart"
+    assert mm.external["github.com/acme/shop"] == {"go:github.com/stretchr/testify", "go:github.com/google/uuid"}
+
+
+def test_composer_packages_and_psr4_namespaces():
+    mm = detect({
+        "composer.json": """
+            {"name": "acme/shop",
+             "require": {"php": ">=8.2", "ext-json": "*", "symfony/http-kernel": "^7.0", "acme/money": "*"},
+             "autoload": {"psr-4": {"App\\\\": "src/"}},
+             "autoload-dev": {"psr-4": {"App\\\\Tests\\\\": "tests/"}}}
+        """,
+        "packages/money/composer.json": '{"name": "acme/money", "autoload": {"psr-4": {"Acme\\\\Money\\\\": "src"}}}',
+        "src/Kernel.php": "<?php",
+        "src/Service/Payment/Stripe.php": "<?php",
+        "tests/Unit/CheckoutTest.php": "<?php",
+        "packages/money/src/Money.php": "<?php",
+    })
+    ids = {mid: info.root for mid, info in mm.modules.items()}
+    assert ids == {"acme/shop": "", "acme/money": "packages/money", "App": "src", "App\\Service\\Payment": "src/Service/Payment",
+                   "App\\Tests\\Unit": "tests/Unit", "Acme\\Money": "packages/money/src"}
+    assert mm.deps == {("acme/shop", "acme/money")}
+    assert mm.external["acme/shop"] == {"composer:symfony/http-kernel"}

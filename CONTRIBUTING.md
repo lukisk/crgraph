@@ -20,7 +20,7 @@ uv venv && uv pip install -e '.[dev]'    # or: python -m venv .venv && .venv/bin
 |---|---|
 | `src/crgraph/cli.py` | arguments, config loading, output files, exit codes |
 | `src/crgraph/gitio.py` | all git access: ranges, changed files, blobs, grep, history |
-| `src/crgraph/modules/` | module detection from build files (Gradle, SwiftPM, npm, Python) |
+| `src/crgraph/modules/` | module detection from build files (Gradle, SwiftPM, npm, Python, Go, Composer) |
 | `src/crgraph/lang/` | tree-sitter language plugins: symbols, signatures, imports, complexity |
 | `src/crgraph/resolve.py`, `build.py` | imports and names to dependency edges, the before/after graphs |
 | `src/crgraph/delta.py`, `expand.py` | the change between the graphs, plus one hop of impacted code |
@@ -33,7 +33,8 @@ uv venv && uv pip install -e '.[dev]'    # or: python -m venv .venv && .venv/bin
 
 1. Add a plugin in `src/crgraph/lang/` modelled on an existing one (`python.py` is the smallest), and register
    it in `PLUGINS` and `GRAMMARS` in `lang/__init__.py`.
-2. If the ecosystem has its own module or package files, add a detector in `src/crgraph/modules/`.
+2. If the ecosystem has its own module or package files, add a detector in `src/crgraph/modules/`, and resolve
+   the plugin's imports to files or modules in `resolve.py`.
 3. Add tests in `tests/lang/` for symbols, signatures, visibility and imports.
 
 ## Adding a finding

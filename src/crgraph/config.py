@@ -14,6 +14,7 @@ DEFAULT_IGNORE = [
 ]
 DEFAULT_TEST_PATTERNS = [
     "**/*Test.kt", "**/*Tests.kt", "**/*Test.swift", "**/*Tests.swift", "**/test_*.py", "**/*_test.py",
+    "**/*_test.go", "**/*Test.php",
     "**/*.spec.{ts,tsx,js,jsx,mjs,cjs,mts,cts}", "**/*.test.{ts,tsx,js,jsx,mjs,cjs,mts,cts}", "**/test/**", "**/tests/**", "**/Tests/**",
     "**/src/*Test/**", "**/__tests__/**",
 ]
