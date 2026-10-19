@@ -20,6 +20,13 @@
     --st-impacted-bg: #1d2024; --st-unchanged-bg: #1d2024; --st-unchanged: #646870;
   }
 }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #15171a; --panel: #1d2024; --fg: #e6e6e3; --muted: #9a9ea5; --line: #30343a; --accent: #7aa2f7;
+  --node-bg: #1d2024; --danger: #ef6b6b;
+  --st-added-bg: #173524; --st-modified-bg: #3a2e12; --st-removed-bg: #3d1c1c; --st-moved-bg: #2b2140;
+  --st-impacted-bg: #1d2024; --st-unchanged-bg: #1d2024; --st-unchanged: #646870;
+}
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; }
@@ -34,6 +41,7 @@ a:hover { text-decoration: underline; }
 #top { padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .headline { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .brand { font-weight: 700; letter-spacing: .02em; }
+#btn-theme { min-width: 32px; padding: 4px 8px; }
 #counts { color: var(--muted); flex: 1; min-width: 200px; }
 #counts b { color: var(--fg); font-weight: 600; }
 #verdict { margin-top: 4px; }

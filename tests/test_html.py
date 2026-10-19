@@ -154,6 +154,57 @@ def test_tests_toggle_hides_test_code_and_comes_back_for_a_search(repo, tmp_path
         browser.close()
 
 
+def test_drag_pans_shift_or_middle_drag_moves_a_box_and_theme_switches(repo, tmp_path):
+    sync_api = pytest.importorskip("playwright.sync_api")
+    path = tmp_path / "report.html"
+    path.write_text(to_html(document(repo)))
+    with sync_api.sync_playwright() as p:
+        try:
+            browser = p.chromium.launch(channel="chrome")
+        except Exception:
+            try:
+                browser = p.chromium.launch()
+            except Exception as exc:  # no browser installed
+                pytest.skip(f"no chromium available: {exc}")
+        page = browser.new_page(color_scheme="light")
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.as_uri())
+        page.wait_for_function("window.__crgraph && window.__crgraph.cy().nodes().length > 0")
+        box = """() => { const cy = window.__crgraph.cy(), n = cy.getElementById('module::core'), bb = n.renderedBoundingBox(),
+                         r = document.getElementById('cy').getBoundingClientRect();
+                         return {x: r.left + (bb.x1 + bb.x2) / 2, y: r.top + (bb.y1 + bb.y2) / 2, pos: n.position(), pan: cy.pan()}; }"""
+
+        def drag(button="left", shift=False):
+            start = page.evaluate(box)
+            page.mouse.move(start["x"], start["y"])
+            if shift:
+                page.keyboard.down("Shift")
+            page.mouse.down(button=button)
+            page.mouse.move(start["x"] + 60, start["y"] + 30, steps=6)
+            page.mouse.up(button=button)
+            if shift:
+                page.keyboard.up("Shift")
+            end = page.evaluate(box)
+            return end["pos"] != start["pos"], end["pan"] != start["pan"]
+
+        assert drag() == (False, True)  # a plain drag on a box pans the view
+        assert drag(shift=True) == (True, False)
+        assert drag("middle") == (True, False)
+
+        color = "window.__crgraph.cy().getElementById('module::core').style('background-color')"
+        light = page.evaluate(color)
+        page.locator("#btn-theme").click()
+        assert page.evaluate("document.documentElement.dataset.theme") == "dark"
+        assert page.evaluate(color) != light  # the graph follows the page colours
+        page.reload()
+        page.wait_for_function("window.__crgraph && window.__crgraph.cy().nodes().length > 0")
+        assert page.evaluate("document.documentElement.dataset.theme") == "dark"  # remembered
+        assert page.locator("#btn-theme").get_attribute("title") == "Light theme"
+        assert errors == []
+        browser.close()
+
+
 def test_symbol_depth_on_a_large_change_shows_the_most_changed_symbols(repo, tmp_path):
     sync_api = pytest.importorskip("playwright.sync_api")
     funcs = lambda v: "".join(f"def f{i}():\n    return {v}\n\n" for i in range(120))  # noqa: E731

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0
+
+- Report: a dark/light theme button; the choice is remembered in the browser.
+- Report: dragging pans the graph also when it starts on a box; Shift+drag or middle-drag moves a box.
+
 ## 0.2.0
 
 - Report: a *Tests* toggle hides test modules, files and symbols in the graph. `delta.json` nodes have a

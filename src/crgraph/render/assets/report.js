@@ -155,14 +155,14 @@
     DATA.nodes.forEach(function (n) { if (visible(n.id)) shown.add(n.id); });
     var areaOf = moduleAreas(shown);
     new Set(areaOf.values()).forEach(function (area) {
-      els.push({ group: "nodes", data: { id: "area:" + area, label: area, w: 50 }, classes: "area" });
+      els.push({ group: "nodes", data: { id: "area:" + area, label: area, w: 50 }, pannable: true, classes: "area" });
     });
     shown.forEach(function (id) {
       var n = nodes.get(id), text = label(n);
       var parent = n.parent && shown.has(n.parent) ? n.parent : areaOf.has(id) ? "area:" + areaOf.get(id) : undefined;
       els.push({
         group: "nodes",
-        data: { id: id, parent: parent, label: text, w: boxWidth(text) },
+        data: { id: id, parent: parent, label: text, w: boxWidth(text) }, pannable: true,
         classes: [n.status, n.kind, state.highlight.has(id) ? "hl" : ""].join(" ")
       });
     });
@@ -235,7 +235,9 @@
   function render(fit) {
     var els = elements();
     if (!cy) {
-      cy = cytoscape({ container: document.getElementById("cy"), elements: els, style: style(), minZoom: 0.05, maxZoom: 3 });
+      cy = cytoscape({ container: document.getElementById("cy"), elements: els, style: style(), minZoom: 0.05, maxZoom: 3,
+        boxSelectionEnabled: false });
+      dragBoxes(document.getElementById("cy"));
       cy.on("tap", "node", function (ev) { select(ev.target.id()); });
       cy.on("tap", "edge", function (ev) { selectEdge(ev.target); });
       cy.on("dbltap", "node", function (ev) { toggle(ev.target.id()); });
@@ -252,6 +254,37 @@
       cy.zoom(MIN_START_ZOOM);
       cy.center(focus.length ? focus : cy.nodes());
     }
+  }
+
+  // A plain drag pans the view, also on a box (boxes can fill the whole view). Shift+drag moves the box through
+  // cytoscape's own grab; the middle button moves it here, because cytoscape ignores that button.
+  function dragBoxes(container) {
+    container.addEventListener("mousedown", function (ev) {  // capture: runs before cytoscape sees the press
+      cy.nodes().forEach(function (n) { if (ev.shiftKey) n.unpanify(); else n.panify(); });
+      if (ev.button !== 1) return;
+      ev.preventDefault(); ev.stopPropagation();  // no autoscroll, no cytoscape handling
+      var box = boxAt(container, ev);
+      if (!box) return;
+      var movers = box.isParent() ? box.descendants().filter(function (n) { return !n.isParent(); }) : box;
+      var last = { x: ev.clientX, y: ev.clientY };
+      var move = function (e) {
+        movers.shift({ x: (e.clientX - last.x) / cy.zoom(), y: (e.clientY - last.y) / cy.zoom() });
+        last = { x: e.clientX, y: e.clientY };
+      };
+      var up = function () { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+    }, true);
+  }
+  function boxAt(container, ev) {  // the innermost box under the pointer
+    var r = container.getBoundingClientRect(), pan = cy.pan(), z = cy.zoom();
+    var x = (ev.clientX - r.left - pan.x) / z, y = (ev.clientY - r.top - pan.y) / z, best = null;
+    cy.nodes().forEach(function (n) {
+      var bb = n.boundingBox({ includeLabels: false });
+      if (x < bb.x1 || x > bb.x2 || y < bb.y1 || y > bb.y2) return;
+      if (!best || n.ancestors().length > best.ancestors().length) best = n;
+    });
+    return best;
   }
 
   // Layout of nested boxes, inside out: every box's direct children are placed with a flat dagre layout (lines lifted
@@ -607,7 +640,7 @@
   }
 
   // story view: a printable document with small focused graphs
-  var MINI_MIN_H = 70, MINI_MAX_H = 260;
+  var MINI_MIN_H = 70, MINI_MAX_H = 260, minis = [];
   function miniGraph(container, ids, level, findingId) {
     var keep = new Set();
     function up(id) {
@@ -631,6 +664,7 @@
     });
     var mini = cytoscape({ container: container, elements: els, style: style(), userZoomingEnabled: false, userPanningEnabled: false, autoungrabify: true,
       maxZoom: 1 });  // small maps keep the graph view's text size instead of blowing up to fill the box
+    minis.push(mini);
     try { mini.layout({ name: "dagre", rankDir: "LR", nodeSep: 12, rankSep: 50, padding: 12 }).run(); }
     catch (err) { mini.layout({ name: "breadthfirst", directed: true, padding: 12 }).run(); }
     if (!container.classList.contains("tall")) {  // as tall as the drawing needs, not a fixed empty frame
@@ -654,10 +688,35 @@
     showFinding(fid);
   }
   var storyBuilt = false;
+  // Theme: follows the system until the button picks one; the choice is remembered per browser.
+  var THEME_KEY = "crgraph-theme", darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  function isDark() {
+    var t = document.documentElement.dataset.theme;
+    return t ? t === "dark" : darkQuery.matches;
+  }
+  function applyTheme(theme) {
+    if (theme) document.documentElement.dataset.theme = theme; else delete document.documentElement.dataset.theme;
+    var btn = document.getElementById("btn-theme"), dark = isDark();
+    btn.textContent = dark ? "☀" : "☾";
+    btn.title = dark ? "Light theme" : "Dark theme";
+    btn.setAttribute("aria-label", btn.title);
+    if (cy) cy.style(style());  // graph colours are read from the CSS variables
+    if (storyBuilt) { storyBuilt = false; if (document.body.classList.contains("story")) renderStory(); }
+  }
+  function toggleTheme() {
+    var theme = isDark() ? "light" : "dark";
+    try { localStorage.setItem(THEME_KEY, theme); } catch (err) { /* private mode: not remembered */ }
+    applyTheme(theme);
+  }
+  function savedTheme() {
+    try { var t = localStorage.getItem(THEME_KEY); return t === "light" || t === "dark" ? t : null; } catch (err) { return null; }
+  }
   function renderStory() {
     if (storyBuilt) return;
     storyBuilt = true;
     var box = document.getElementById("story"), html = "";
+    minis.forEach(function (m) { m.destroy(); });  // rebuilt after a theme switch
+    minis = [];
     html += "<section><h1>" + esc(DATA.range.label) + "</h1><p>" + document.getElementById("counts").innerHTML + "</p>" +
       (DATA.explain ? "<p>" + esc(DATA.explain) + "</p>" : "") + "</section>";
     if (DATA.overview && DATA.overview.verdict) html += overviewHtml(DATA.overview);
@@ -711,6 +770,8 @@
     else if (t.dataset.depth) setDepth(t.dataset.depth);
   });
   document.getElementById("btn-story").addEventListener("click", toggleStory);
+  document.getElementById("btn-theme").addEventListener("click", toggleTheme);
+  darkQuery.addEventListener("change", function () { if (!document.documentElement.dataset.theme) applyTheme(null); });
   document.getElementById("focus").addEventListener("change", function (ev) { state.focus = ev.target.checked; render(true); });
   document.getElementById("tests").addEventListener("change", function (ev) { state.tests = ev.target.checked; render(false); });
   document.getElementById("status-filters").addEventListener("change", function (ev) {
@@ -729,11 +790,12 @@
     }, 250);
   });
 
+  applyTheme(savedTheme());
   renderHeader();
   renderFindings();
   renderStatusFilters();
   document.getElementById("tests-filter").hidden = !DATA.nodes.some(function (n) { return n.test; });
   setMode("merged", false);
   setDepth((DATA.ui && DATA.ui.depth) || "module");
-  window.__crgraph = { state: state, cy: function () { return cy; }, showFinding: showFinding };
+  window.__crgraph = { state: state, cy: function () { return cy; }, showFinding: showFinding, toggleTheme: toggleTheme };
 })();
