@@ -39,17 +39,28 @@ button.on, button[aria-pressed="true"] { background: var(--accent); border-color
 a, a:visited { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 #top { padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
-.headline { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.headline { display: flex; align-items: center; gap: 12px; }
 .brand { font-weight: 700; letter-spacing: .02em; }
 #btn-theme { min-width: 32px; padding: 4px 8px; }
-#counts { color: var(--muted); flex: 1; min-width: 200px; }
+#range { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }  /* long branch names */
+#counts { color: var(--muted); margin-top: 4px; }
 #counts b { color: var(--fg); font-weight: 600; }
+#counts .grp { white-space: nowrap; }  /* wrap between groups, never inside one */
 #verdict { margin-top: 4px; }
 .size { display: inline-block; min-width: 22px; padding: 0 6px; border-radius: 4px; background: var(--fg); color: var(--panel); font-weight: 700; text-align: center; }
 #story .overview td.num { text-align: right; white-space: nowrap; }
 #story .overview ol { padding-left: 22px; }
 #top details { margin-top: 8px; }
-#explain-text { margin: 6px 0 0; max-width: 90ch; }
+#btn-review { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; }
+#story-review { scroll-margin-top: 16px; }
+dl.review { display: grid; grid-template-columns: max-content minmax(0, 110ch); gap: 4px 14px; margin: 0; }
+dl.review dt { font-weight: 600; }
+dl.review dd { margin: 0; }
+.rv { display: inline-block; padding: 0 8px; border-radius: 10px; border: 1px solid; font-weight: 600; font-size: 12px; }
+.rv.good, #btn-review.good { border-color: var(--st-added); background: var(--st-added-bg); }
+.rv.acceptable, #btn-review.acceptable { border-color: var(--st-modified); background: var(--st-modified-bg); }
+.rv.needs-work, #btn-review.needs-work { border-color: var(--st-removed); background: var(--st-removed-bg); }
+p.explain-text { margin: 0; max-width: 110ch; white-space: pre-line; }
 #app { flex: 1; display: grid; grid-template-columns: 300px 1fr 320px; min-height: 0; }
 #findings, #details { overflow: auto; padding: 12px 14px; background: var(--panel); }
 #findings { border-right: 1px solid var(--line); }

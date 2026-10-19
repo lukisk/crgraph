@@ -139,3 +139,14 @@ def test_markdown_cells_cannot_inject_links_images_or_html():
     from crgraph.render.markdown import _cell
     out = _cell("![x](https://evil/p.png) [y](javascript:z) <img src=q> **b** a|b\nc")
     assert out == "\\!\\[x\\](https://evil/p.png) \\[y\\](javascript:z) &lt;img src=q&gt; \\*\\*b\\*\\* a\\|b c"
+
+
+def test_markdown_shows_the_review_as_a_verdict_and_table():
+    base = {"range": {"label": "a..b"}, "stats": {"modules": {}, "files": {}, "symbols": {}, "findings": {}},
+            "nodes": [], "edges": [], "findings": [], "warnings": []}
+    md = to_markdown({**base, "explain": "x", "review": {"verdict": "Acceptable", "reason": "small | safe",
+                                                          "items": [["DRY", "no *duplication*"]]}})
+    assert "**AI review: 🟡 Acceptable** — small \\| safe" in md
+    assert "| Aspect | Assessment |" in md and "| DRY | no \\*duplication\\* |" in md
+    plain = to_markdown({**base, "explain": "Free text.", "review": None})
+    assert "Free text." in plain and "Aspect" not in plain

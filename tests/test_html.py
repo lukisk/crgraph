@@ -8,6 +8,7 @@ from test_render import python_with_tests
 
 from crgraph.render.html import to_html
 from crgraph.render.jsonout import to_document
+from crgraph.review import parse_review
 
 REPO = "package com.example.core\nclass Repo { fun load(id: Int): Int = id }\n"
 
@@ -202,6 +203,39 @@ def test_drag_pans_shift_or_middle_drag_moves_a_box_and_theme_switches(repo, tmp
         assert page.evaluate("document.documentElement.dataset.theme") == "dark"  # remembered
         assert page.locator("#btn-theme").get_attribute("title") == "Light theme"
         assert errors == []
+        browser.close()
+
+
+def test_long_range_keeps_the_header_tidy_and_the_review_opens_in_the_story(repo, tmp_path):
+    sync_api = pytest.importorskip("playwright.sync_api")
+    doc = document(repo)
+    doc["range"]["label"] = "origin/feature/" + "very-long-branch-name/" * 6 + "...origin/feature/other"
+    doc["explain"] = "Verdict: Needs work — new module cycle\nArchitecture: :core now depends on :app.\nDRY: fine."
+    doc["review"] = parse_review(doc["explain"])
+    path = tmp_path / "report.html"
+    path.write_text(to_html(doc))
+    with sync_api.sync_playwright() as p:
+        try:
+            browser = p.chromium.launch(channel="chrome")
+        except Exception:
+            try:
+                browser = p.chromium.launch()
+            except Exception as exc:  # no browser installed
+                pytest.skip(f"no chromium available: {exc}")
+        page = browser.new_page(viewport={"width": 1280, "height": 800})
+        page.goto(path.as_uri())
+        page.wait_for_function("window.__crgraph && window.__crgraph.cy().nodes().length > 0")
+        line = "el => Math.round(el.getBoundingClientRect().height)"
+        assert page.locator("#range").evaluate(line) < 24  # one line, cut with an ellipsis
+        assert page.locator("#range").get_attribute("title") == doc["range"]["label"]
+        assert page.locator("#counts").evaluate(line) < 24  # the counts get a full row
+        review = page.locator("#btn-review")
+        assert review.text_content() == "✦Needs work" and "needs-work" in review.get_attribute("class")
+        assert review.get_attribute("title") == "AI review: Needs work — new module cycle · open in the story view"
+        review.click()
+        assert page.locator("#story").is_visible()
+        assert page.locator("#story-review dt").all_inner_texts() == ["Architecture", "DRY"]
+        assert page.locator("#story-review").evaluate("el => el.getBoundingClientRect().top") < 200  # scrolled to it
         browser.close()
 
 

@@ -181,12 +181,29 @@ def overview(ov: dict[str, Any]) -> list[str]:
     return out
 
 
+VERDICT_ICON = {"Good": "🟢", "Acceptable": "🟡", "Needs work": "🔴"}
+
+
+def review(doc: dict[str, Any]) -> list[str]:
+    r = doc.get("review")
+    if not doc.get("explain"):
+        return []
+    if not r:  # the model did not use the review format: show its text as is
+        return [_cell(line) for line in doc["explain"].splitlines()] + [""]
+    head = "**AI review**"
+    if r["verdict"]:
+        head = f"**AI review: {VERDICT_ICON[r['verdict']]} {r['verdict']}**" + (f" — {_cell(r['reason'])}" if r["reason"] else "")
+    out = [head, ""]
+    if r["items"]:
+        out += ["| Aspect | Assessment |", "|---|---|", *(f"| {_cell(label)} | {_cell(text)} |" for label, text in r["items"]), ""]
+    return out
+
+
 def to_markdown(doc: dict[str, Any]) -> str:
     st = doc["stats"]
     sev = st["findings"]
     out = [f"## crgraph · {_code(doc['range']['label'])}", ""]
-    if doc.get("explain"):
-        out += [_cell(line) for line in doc["explain"].splitlines()] + [""]
+    out += review(doc)
     out.append(f"**Modules:** {_counts(st['modules'])} · **Files:** {_counts(st['files'])} · "
                f"**Symbols:** {_counts(st['symbols'])} · **Findings:** 🔴 {sev.get('red', 0)} "
                f"🟡 {sev.get('yellow', 0)} ⚪ {sev.get('info', 0)}")

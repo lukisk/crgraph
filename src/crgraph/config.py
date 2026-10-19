@@ -1,6 +1,7 @@
-"""Loading and validating `.crgraph.yml`."""
+"""Loading and validating `.crgraph.yml` and the personal config (`~/.config/crgraph/config.yml`)."""
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,11 @@ DEFAULT_CONTRACT_FILES = [
 CONFIG_FILE = ".crgraph.yml"
 TOP_KEYS = {"modules", "ignore", "test_patterns", "contract_files", "rules", "thresholds", "explain",
             "fallback_depth", "blast_max_files"}
+EXPLAIN_KEYS = {"model", "include_signatures", "plain"}
+# where the summary goes and with which credentials: personal config only, so a repository cannot redirect them
+PERSONAL_EXPLAIN_KEYS = {"base_url", "auth_token", "auth_token_env", "auth_token_command", "token_header"}
+TOKEN_SOURCES = ("auth_token", "auth_token_env", "auth_token_command")
+TOKEN_HEADERS = ("authorization", "x-api-key")
 
 
 class ConfigError(Exception):
@@ -61,6 +67,12 @@ class Thresholds:
 class ExplainConfig:
     model: str = "claude-opus-5-5"
     include_signatures: bool = True
+    plain: bool = False  # only standard Messages API fields: for proxies and non-Claude models
+    base_url: str | None = None
+    auth_token: str | None = field(default=None, repr=False)
+    auth_token_env: str | None = None  # name of the variable holding the token
+    auth_token_command: str | None = None  # shell command printing the token
+    token_header: str = "authorization"  # or "x-api-key"
 
 
 @dataclass
@@ -111,6 +123,52 @@ def _rule(raw: Any, where: str) -> ForbidRule | LayersRule:
     raise ConfigError(f"{where}: unknown rule type '{kind}'")
 
 
+def _explain(raw: Any, cfg: ExplainConfig, where: str, allowed: set[str]) -> None:
+    explain = _expect(raw, dict, where)
+    personal = set(explain) & PERSONAL_EXPLAIN_KEYS - allowed
+    if personal:
+        raise ConfigError(f"{where}: {', '.join(sorted(personal))} can only be set in your personal config "
+                          f"({user_config_path()})")
+    unknown = set(explain) - allowed
+    if unknown:
+        raise ConfigError(f"{where}: unknown key(s): {', '.join(sorted(unknown))}")
+    for key, value in explain.items():
+        setattr(cfg, key, _expect(value, bool if key in ("include_signatures", "plain") else str, f"{where}.{key}"))
+    if cfg.token_header not in TOKEN_HEADERS:
+        raise ConfigError(f"{where}.token_header must be one of: {', '.join(TOKEN_HEADERS)}")
+    if sum(1 for key in TOKEN_SOURCES if getattr(cfg, key)) > 1:
+        raise ConfigError(f"{where}: set only one of {', '.join(TOKEN_SOURCES)}")
+
+
+def _load_yaml(text: str, path: str) -> dict[str, Any]:
+    try:
+        raw = yaml.safe_load(text) or {}
+    except yaml.YAMLError as exc:
+        raise ConfigError(f"{path}: invalid YAML: {exc}") from exc
+    if not isinstance(raw, dict):
+        raise ConfigError(f"{path}: top level must be a mapping")
+    return raw
+
+
+def user_config_path() -> Path:
+    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "crgraph" / "config.yml"
+
+
+def apply_user_config(cfg: ExplainConfig, path: Path | None = None) -> None:
+    """Personal settings override the repository's `explain` settings."""
+    path = path or user_config_path()
+    if not path.is_file():
+        return
+    raw = _load_yaml(path.read_text(), str(path))
+    unknown = set(raw) - {"explain"}
+    if unknown:
+        raise ConfigError(f"{path}: unknown key(s): {', '.join(sorted(unknown))} (only explain is personal)")
+    explain = raw.get("explain", {})
+    if isinstance(explain, dict) and "auth_token" in explain and os.name == "posix" and path.stat().st_mode & 0o077:
+        raise ConfigError(f"{path} holds a token but other users can read it; run: chmod 600 {path}")
+    _explain(explain, cfg, f"{path}: explain", EXPLAIN_KEYS | PERSONAL_EXPLAIN_KEYS)
+
+
 def load_config(path: Path | None, *, required: bool = False) -> Config:
     if path is None or not path.exists():
         if required:
@@ -121,12 +179,7 @@ def load_config(path: Path | None, *, required: bool = False) -> Config:
 
 def parse_config(text: str, path: str) -> Config:
     """`path` only names the source in error messages."""
-    try:
-        raw = yaml.safe_load(text) or {}
-    except yaml.YAMLError as exc:
-        raise ConfigError(f"{path}: invalid YAML: {exc}") from exc
-    if not isinstance(raw, dict):
-        raise ConfigError(f"{path}: top level must be a mapping")
+    raw = _load_yaml(text, path)
     unknown = set(raw) - TOP_KEYS
     if unknown:
         raise ConfigError(f"{path}: unknown key(s): {', '.join(sorted(unknown))}")
@@ -144,11 +197,7 @@ def parse_config(text: str, path: str) -> Config:
         if not hasattr(cfg.thresholds, key) or not isinstance(value, int):
             raise ConfigError(f"{path}: thresholds.{key} must be a known integer setting")
         setattr(cfg.thresholds, key, value)
-    explain = _expect(raw.get("explain", {}), dict, f"{path}: explain")
-    if "model" in explain:
-        cfg.explain.model = _expect(explain["model"], str, f"{path}: explain.model")
-    if "include_signatures" in explain:
-        cfg.explain.include_signatures = _expect(explain["include_signatures"], bool, f"{path}: explain.include_signatures")
+    _explain(raw.get("explain", {}), cfg.explain, f"{path}: explain", EXPLAIN_KEYS)
     for key in ("fallback_depth", "blast_max_files"):
         if key in raw:
             setattr(cfg, key, _expect(raw[key], int, f"{path}: {key}"))

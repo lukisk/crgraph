@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0
+
+- `--explain` is now an architecture review: a verdict (Good / Acceptable / Needs work) with the reason, then
+  architecture, coupling & cohesion, SOLID, DRY, testability, API compatibility, risks and suggestions, each
+  based on named facts. The model also gets sizes, complexity, test flags, the overview and a duplication hint.
+- Report: a ✦ verdict button in the header (Good / Acceptable / Needs work, reason on hover) opens the review in
+  the story view. `summary.md` shows it as a table; `delta.json` has a parsed `review`.
+- Report: a long range no longer squeezes the header; it is cut with "…" (full text on hover) and the counts get
+  their own row.
+- `--explain` through your own LLM proxy: a personal config, `~/.config/crgraph/config.yml`, can set the model,
+  `base_url` and a token: inline (file must be `chmod 600`), from an environment variable or from a command. `plain: true` sends only standard request fields.
+- A repository's `.crgraph.yml` rejects unknown `explain` keys and can never set the proxy or token.
+
 ## 0.3.0
 
 - Report: a dark/light theme button; the choice is remembered in the browser.

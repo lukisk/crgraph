@@ -1,6 +1,14 @@
 import pytest
 
-from crgraph.config import DEFAULT_IGNORE, ConfigError, ForbidRule, LayersRule, load_config
+from crgraph.config import (
+    DEFAULT_IGNORE,
+    ConfigError,
+    ExplainConfig,
+    ForbidRule,
+    LayersRule,
+    apply_user_config,
+    load_config,
+)
 from crgraph.globs import glob_match, literal_prefix, match_any
 
 
@@ -74,3 +82,56 @@ def test_invalid_config_names_path_and_key(tmp_path, body, message):
     with pytest.raises(ConfigError, match=message) as err:
         load_config(p)
     assert str(p) in str(err.value)
+
+
+def test_repository_config_cannot_redirect_the_summary(tmp_path):
+    p = tmp_path / ".crgraph.yml"
+    p.write_text("explain: { base_url: https://evil.example, auth_token_env: HOME }\n")
+    with pytest.raises(ConfigError, match="auth_token_env, base_url can only be set in your personal config"):
+        load_config(p)
+    p.write_text("explain: { modle: x }\n")
+    with pytest.raises(ConfigError, match="unknown key"):
+        load_config(p)
+    p.write_text("explain: { model: gpt-proxy, plain: true }\n")
+    assert load_config(p).explain.plain is True
+
+
+def test_personal_config_overrides_the_repository(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    repo = tmp_path / ".crgraph.yml"
+    repo.write_text("explain: { model: claude-haiku-5-5, include_signatures: false }\n")
+    cfg = load_config(repo).explain
+    apply_user_config(cfg)  # no personal file yet: unchanged
+    assert cfg.model == "claude-haiku-5-5" and cfg.base_url is None
+    user = tmp_path / "crgraph" / "config.yml"
+    user.parent.mkdir()
+    user.write_text("explain:\n  model: proxy-model\n  base_url: https://proxy.example\n"
+                    "  auth_token_env: LLM_PROXY_TOKEN\n  plain: true\n")
+    apply_user_config(cfg)
+    assert (cfg.model, cfg.base_url, cfg.auth_token_env, cfg.plain, cfg.include_signatures) == \
+        ("proxy-model", "https://proxy.example", "LLM_PROXY_TOKEN", True, False)
+
+
+@pytest.mark.parametrize(("text", "error"), [
+    ("rules: []\n", "only explain is personal"),
+    ("explain: { auth_token_env: A, auth_token_command: b }\n", "only one of"),
+    ("explain: { token_header: cookie }\n", "token_header must be one of"),
+    ("explain: { plain: yes-please }\n", "explain.plain must be a bool"),
+])
+def test_personal_config_is_validated(tmp_path, text, error):
+    user = tmp_path / "config.yml"
+    user.write_text(text)
+    with pytest.raises(ConfigError, match=error):
+        apply_user_config(ExplainConfig(), user)
+
+
+def test_a_token_in_the_personal_config_needs_a_private_file(tmp_path):
+    user = tmp_path / "config.yml"
+    user.write_text("explain: { base_url: https://proxy.example, auth_token: tok-file }\n")
+    user.chmod(0o644)
+    with pytest.raises(ConfigError, match="chmod 600"):
+        apply_user_config(ExplainConfig(), user)
+    user.chmod(0o600)
+    cfg = ExplainConfig()
+    apply_user_config(cfg, user)
+    assert cfg.auth_token == "tok-file" and "tok-file" not in repr(cfg)

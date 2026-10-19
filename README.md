@@ -34,7 +34,7 @@ pipx install git+https://github.com/lukisk/crgraph
 ```
 
 To upgrade, run `uv tool upgrade crgraph` (or `pipx upgrade crgraph`). To pin a release, append it to the URL:
-`git+https://github.com/lukisk/crgraph@v0.3.0`.
+`git+https://github.com/lukisk/crgraph@v0.4.0`.
 
 Language grammars download on first use. For CI images or offline machines, run `crgraph grammars fetch` once.
 
@@ -185,7 +185,7 @@ crgraph:
     - uses: actions/checkout@v5
       with: { fetch-depth: 0 }
     - uses: astral-sh/setup-uv@v7
-    - run: uv tool install git+https://github.com/lukisk/crgraph@v0.3.0
+    - run: uv tool install git+https://github.com/lukisk/crgraph@v0.4.0
     - run: crgraph origin/${{ github.base_ref }}...HEAD -g --fail-on never
     - run: cat crgraph-out/summary.md >> "$GITHUB_STEP_SUMMARY"
     - uses: actions/upload-artifact@v4
@@ -200,7 +200,7 @@ crgraph:
   rules: [{ if: $CI_MERGE_REQUEST_IID }]
   variables: { GIT_DEPTH: 0 }
   script:
-    - uv tool install git+https://github.com/lukisk/crgraph@v0.3.0
+    - uv tool install git+https://github.com/lukisk/crgraph@v0.4.0
     - ~/.local/bin/crgraph origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD -g --fail-on red
   artifacts: { when: always, paths: [crgraph-out/], expose_as: crgraph report }
 ```
@@ -223,7 +223,7 @@ rules:
   - forbid: { from: "**", to: "**:impl", except_from: "**/di/**" }    # only DI sees implementations
   - layers: { order: [ui, presentation, domain, data], match: "**/{layer}/**" }
 thresholds: { blast_modules: 5, fanout_delta: 3, complexity_delta: 5, complexity_max: 15 }
-explain: { model: claude-opus-5-5, include_signatures: true }
+explain: { model: claude-opus-5-5, include_signatures: true, plain: false }
 ```
 
 ## Options
@@ -238,11 +238,46 @@ explain: { model: claude-opus-5-5, include_signatures: true }
 | `--fail-on red\|yellow\|never` | exit 1 when findings reach this severity (default `red`) |
 | `--config PATH` | use this config file instead of the base revision's `.crgraph.yml` |
 | `--staged` | compare with the index instead of the working tree |
-| `--explain` | add a short summary written by Claude |
+| `--explain` | add an AI architecture review (see below) |
 | `--version` | print the version |
 
-`--explain` sends module, file and symbol names, statuses and findings to the Anthropic API. It never sends
-code. It needs `ANTHROPIC_API_KEY` or `ant auth login`.
+### AI architecture review
+
+`--explain` asks a model whether the change is in good shape. The answer starts with a verdict, **Good**,
+**Acceptable** or **Needs work**, and the main reason. It then gives one line each on architecture, coupling and
+cohesion, SOLID, DRY, testability, API compatibility, the top risks and concrete suggestions. Every line names
+the modules, types or numbers it is based on.
+
+The model never sees code. It gets module, file and symbol names, statuses, signatures, sizes, complexity,
+dependency changes, the overview and the findings, plus a hint about new types whose name already exists
+elsewhere (possible duplication). Where the structure cannot show something, the review says so instead of
+guessing.
+
+The verdict is a ✦ button in the report header; clicking it opens the full review in the story view.
+`summary.md` shows it as a table. `delta.json` has the raw text in `explain` and the parsed review in `review`.
+
+It needs `ANTHROPIC_API_KEY`, `ant auth login` or your own proxy (below).
+
+### Explain through your own LLM proxy
+
+Any proxy that accepts the Anthropic Messages API (`POST /v1/messages`, as LiteLLM and most gateways do) works.
+Put the connection in your personal config, `~/.config/crgraph/config.yml` (or `$XDG_CONFIG_HOME/crgraph/`):
+
+```yaml
+explain:
+  model: <model name in your proxy>
+  base_url: https://llm-proxy.example.com     # without /v1
+  auth_token_env: LLM_PROXY_TOKEN             # the variable that holds the token
+  # auth_token_command: "security find-generic-password -s llm-proxy -w"   # or a command that prints it
+  # auth_token: <token>                       # or the token itself (the file must be chmod 600)
+  # token_header: x-api-key                   # default: Authorization: Bearer
+  plain: true                                 # only standard request fields, for non-Claude models
+```
+
+- Settings here override the repository's `explain` settings.
+- `base_url` and the token settings are only accepted in this file. A repository's `.crgraph.yml` cannot send
+  your summary or token somewhere else.
+- When no token is configured here, the usual `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` variables are used.
 
 ## How it works
 

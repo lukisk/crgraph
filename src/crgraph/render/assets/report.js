@@ -607,23 +607,43 @@
   function renderHeader() {
     var st = DATA.stats, sev = st.findings || {};
     document.getElementById("range").textContent = DATA.range.label;
-    document.getElementById("counts").innerHTML = "<b>Modules</b> " + esc(counts(st.modules)) + " · <b>Files</b> " + esc(counts(st.files)) +
-      " · <b>Symbols</b> " + esc(counts(st.symbols)) + " · 🔴 " + (sev.red || 0) + " 🟡 " + (sev.yellow || 0) + " ⚪ " + (sev.info || 0);
+    document.getElementById("range").title = DATA.range.label;
+    document.getElementById("counts").innerHTML = [
+      "<b>Modules</b> " + esc(counts(st.modules)), "<b>Files</b> " + esc(counts(st.files)), "<b>Symbols</b> " + esc(counts(st.symbols)),
+      "🔴 " + (sev.red || 0) + " 🟡 " + (sev.yellow || 0) + " ⚪ " + (sev.info || 0)
+    ].map(function (g) { return '<span class="grp">' + g + "</span>"; }).join(" · ");
     if (DATA.overview && DATA.overview.verdict) {
       var v = document.getElementById("verdict");
       v.hidden = false;
       v.innerHTML = verdictHtml(DATA.overview);
     }
-    if (DATA.explain) {
-      document.getElementById("explain").hidden = false;
-      document.getElementById("explain").open = true;
-      document.getElementById("explain-text").textContent = DATA.explain;
+    if (DATA.explain) {  // just the verdict here; the review itself is in the story view
+      var r = DATA.review || {}, btn = document.getElementById("btn-review");
+      btn.hidden = false;
+      btn.className = verdictClass(r.verdict);
+      btn.innerHTML = '<span aria-hidden="true">✦</span>' + esc(r.verdict || "AI review");
+      btn.title = "AI review" + (r.verdict ? ": " + r.verdict + (r.reason ? " — " + r.reason : "") : "") + " · open in the story view";
     }
     if (DATA.warnings && DATA.warnings.length) {
       document.getElementById("warnings").hidden = false;
       document.getElementById("warnings-summary").textContent = DATA.warnings.length + " warning(s)";
       document.getElementById("warnings-list").innerHTML = DATA.warnings.map(function (w) { return "<li>" + esc(w) + "</li>"; }).join("");
     }
+  }
+  function verdictClass(verdict) { return verdict ? verdict.toLowerCase().replace(" ", "-") : ""; }
+  function reviewHeadline() {
+    var r = DATA.review;
+    if (!r || !r.verdict) return "AI review";
+    return 'AI review <span class="rv ' + esc(verdictClass(r.verdict)) + '">' + esc(r.verdict) + "</span>" + (r.reason ? " " + esc(r.reason) : "");
+  }
+  function openReview() {
+    if (!document.body.classList.contains("story")) toggleStory();
+    document.getElementById("story-review").scrollIntoView({ block: "start" });
+  }
+  function reviewBody() {
+    var r = DATA.review;
+    if (!r || !r.items.length) return '<p class="explain-text">' + esc(DATA.explain) + "</p>";
+    return '<dl class="review">' + r.items.map(function (it) { return "<dt>" + esc(it[0]) + "</dt><dd>" + esc(it[1]) + "</dd>"; }).join("") + "</dl>";
   }
   function syncStatusFilters() {
     document.querySelectorAll("#status-filters input").forEach(function (i) { i.checked = state.statuses.has(i.value); });
@@ -718,7 +738,8 @@
     minis.forEach(function (m) { m.destroy(); });  // rebuilt after a theme switch
     minis = [];
     html += "<section><h1>" + esc(DATA.range.label) + "</h1><p>" + document.getElementById("counts").innerHTML + "</p>" +
-      (DATA.explain ? "<p>" + esc(DATA.explain) + "</p>" : "") + "</section>";
+      "</section>";
+    if (DATA.explain) html += '<section id="story-review"><h2>' + reviewHeadline() + "</h2>" + reviewBody() + "</section>";
     if (DATA.overview && DATA.overview.verdict) html += overviewHtml(DATA.overview);
     html += '<section><h2>Module map</h2><div class="mini tall" id="mini-modules"></div></section>';
     ["red", "yellow", "info"].forEach(function (sev) {
@@ -771,6 +792,7 @@
   });
   document.getElementById("btn-story").addEventListener("click", toggleStory);
   document.getElementById("btn-theme").addEventListener("click", toggleTheme);
+  document.getElementById("btn-review").addEventListener("click", openReview);
   darkQuery.addEventListener("change", function () { if (!document.documentElement.dataset.theme) applyTheme(null); });
   document.getElementById("focus").addEventListener("change", function (ev) { state.focus = ev.target.checked; render(true); });
   document.getElementById("tests").addEventListener("change", function (ev) { state.tests = ev.target.checked; render(false); });

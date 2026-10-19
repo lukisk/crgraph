@@ -14,7 +14,7 @@ from pathlib import Path
 import tree_sitter_language_pack as tslp
 
 from . import __version__
-from .config import CONFIG_FILE, Config, ConfigError, load_config, parse_config
+from .config import CONFIG_FILE, Config, ConfigError, apply_user_config, load_config, parse_config
 from .explain import explain
 from .gitio import GitError, RangeSpec, Repo
 from .lang import GRAMMARS
@@ -23,6 +23,7 @@ from .pipeline import run
 from .render.html import to_html
 from .render.jsonout import to_document, to_json
 from .render.markdown import to_markdown
+from .review import parse_review
 
 FORMATS = {"html", "md", "json"}
 DEFAULT_OUT = "crgraph-out"
@@ -47,7 +48,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--format", help=f"comma-separated: html, md, json (default: {DEFAULT_FORMATS}); implies --generate")
     p.add_argument("--open", action="store_true", help="with --generate: also open report.html in the browser")
     p.add_argument("--depth", choices=["module", "file", "symbol"], default="module", help="initial graph depth")
-    p.add_argument("--explain", action="store_true", help="add a Claude summary (sends names and findings, never code)")
+    p.add_argument("--explain", action="store_true",
+                   help="add an AI architecture review (sends names, structure and findings, never code)")
     p.add_argument("--fail-on", choices=["red", "yellow", "never"], default="red", help="exit 1 at this severity")
     p.add_argument("--config", help="config file (default: .crgraph.yml as of the base revision)")
     return p
@@ -108,6 +110,8 @@ def main(argv: list[str] | None = None) -> int:
         repo = Repo.discover(Path.cwd())
         rng = repo.resolve_range(args.revs, staged=args.staged)
         config = load_config(Path(args.config), required=True) if args.config else base_config(repo, rng)
+        if args.explain:
+            apply_user_config(config.explain)
         out = Path(args.out or DEFAULT_OUT) if generate else preview_dir()
         # our own reports from a previous run are not part of the change; only those exact files, and by their
         # unresolved path, so an output dir that is (or is linked to) real sources cannot hide changes
@@ -122,6 +126,7 @@ def main(argv: list[str] | None = None) -> int:
         doc = to_document(result, depth=args.depth)
         if args.explain:
             doc["explain"], warning = explain(doc, config.explain)
+            doc["review"] = parse_review(doc["explain"])
             if warning:
                 doc["warnings"].append(warning)
         out.mkdir(parents=True, exist_ok=True)

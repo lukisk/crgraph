@@ -9,6 +9,7 @@ from typing import Any
 
 from ..model import Status
 from ..pipeline import RunResult
+from ..review import parse_review
 
 SCHEMA_VERSION = 1
 
@@ -80,6 +81,7 @@ def to_document(result: RunResult, *, depth: str = "module", explain: str | None
         "owners": result.owners,
         "warnings": list(result.warnings),
         "explain": explain,
+        "review": parse_review(explain),
     })
 
 
