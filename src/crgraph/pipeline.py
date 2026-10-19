@@ -35,6 +35,7 @@ class RunResult:
     warnings: list[str] = field(default_factory=list)
     owners: dict[str, list[str]] = field(default_factory=dict)
     overview: dict[str, Any] = field(default_factory=dict)
+    tests: set[str] = field(default_factory=set)  # ids of test modules, files and symbols
 
 
 def _import_neighbours(facts: dict[str, FileFacts], index: RepoIndex, modules: ModuleMap) -> set[str]:
@@ -46,6 +47,12 @@ def _import_neighbours(facts: dict[str, FileFacts], index: RepoIndex, modules: M
             if len(target.files) <= MAX_NEIGHBOURS_PER_IMPORT:
                 out |= {t for t in target.files if modules.module_of(t) == module}
     return out
+
+
+def _test_code(delta: GraphDelta, patterns: list[str]) -> set[str]:
+    """Test files and their symbols, and modules whose folder is a test folder (Tests/AppTests, tests/)."""
+    return {nid for nid, n in delta.nodes.items()
+            if n.path and match_any(patterns, f"{n.path}/_" if n.kind == "module" else n.path)}
 
 
 def run(repo: Repo, rng: RangeSpec, config: Config, pathspecs: list[str] | None = None) -> RunResult:
@@ -102,4 +109,5 @@ def run(repo: Repo, rng: RangeSpec, config: Config, pathspecs: list[str] | None 
         findings.sort(key=lambda f: (-SEVERITY_RANK[f.severity], f.rule, f.title))
     overview = build_overview(ctx, findings, repo.numstat(rng, pathspecs))
     return RunResult(rng, changes, before, after, delta, findings, mods_before, mods_after, facts_before,
-                     facts_after, warnings, ctx.extras.get("owners", {}), overview)
+                     facts_after, warnings, ctx.extras.get("owners", {}), overview,
+                     _test_code(delta, config.test_patterns))

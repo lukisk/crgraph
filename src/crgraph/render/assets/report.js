@@ -34,7 +34,7 @@
     incoming.get(e.dst).push(e);
   });
 
-  var state = { mode: "merged", expanded: new Set(), focus: true, statuses: new Set(STATUSES), highlight: new Set(), selected: null };
+  var state = { mode: "merged", expanded: new Set(), focus: true, tests: true, statuses: new Set(STATUSES), highlight: new Set(), selected: null };
   var cy = null;
 
   function esc(s) {
@@ -70,7 +70,7 @@
     return true;
   }
   function passes(n) {
-    return inMode(n.status) && state.statuses.has(n.status) && (!state.focus || interesting.has(n.id));
+    return inMode(n.status) && state.statuses.has(n.status) && (state.tests || !n.test) && (!state.focus || interesting.has(n.id));
   }
   function visible(id) {
     var n = nodes.get(id);
@@ -364,6 +364,7 @@
       var n = nodes.get(id);
       if (!state.statuses.has(n.status)) state.statuses.add(n.status);
       if (state.focus && !interesting.has(id)) { state.focus = false; document.getElementById("focus").checked = false; }
+      if (n.test && !state.tests) { state.tests = true; document.getElementById("tests").checked = true; }
       if (!inMode(n.status)) setMode("merged", false);
       ancestors(id).forEach(function (a) { state.expanded.add(a); });
     });
@@ -711,6 +712,7 @@
   });
   document.getElementById("btn-story").addEventListener("click", toggleStory);
   document.getElementById("focus").addEventListener("change", function (ev) { state.focus = ev.target.checked; render(true); });
+  document.getElementById("tests").addEventListener("change", function (ev) { state.tests = ev.target.checked; render(false); });
   document.getElementById("status-filters").addEventListener("change", function (ev) {
     if (ev.target.checked) state.statuses.add(ev.target.value); else state.statuses.delete(ev.target.value);
     render(false);
@@ -730,6 +732,7 @@
   renderHeader();
   renderFindings();
   renderStatusFilters();
+  document.getElementById("tests-filter").hidden = !DATA.nodes.some(function (n) { return n.test; });
   setMode("merged", false);
   setDepth((DATA.ui && DATA.ui.depth) || "module");
   window.__crgraph = { state: state, cy: function () { return cy; }, showFinding: showFinding };

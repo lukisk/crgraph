@@ -55,6 +55,7 @@ def to_document(result: RunResult, *, depth: str = "module", explain: str | None
         nodes.append({
             "id": n.id, "kind": n.kind, "name": n.name, "parent": n.parent, "path": n.path,
             "from_path": n.from_path, "module": n.module, "lang": n.lang, "status": n.status.value,
+            "test": n.id in result.tests,
             "visibility": (a or b).visibility,
             "signature_before": b.signature if b else None, "signature_after": a.signature if a else None,
             "loc_before": b.loc if b else None, "loc_after": a.loc if a else None,

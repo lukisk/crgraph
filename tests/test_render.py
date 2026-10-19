@@ -16,6 +16,13 @@ def result(repo):
     return run_range(repo, base, head)
 
 
+def python_with_tests(repo):
+    test = "from pkg.calc import add\n\n\ndef test_add():\n    assert add({}) == 3\n"
+    base = repo.commit({"pkg/calc.py": "def add(a, b):\n    return a + b\n", "tests/test_calc.py": test.format("1, 2")})
+    head = repo.commit({"pkg/calc.py": "def add(a, b):\n    return b + a\n", "tests/test_calc.py": test.format("2, 1")})
+    return run_range(repo, base, head)
+
+
 def test_document_shape_and_no_source_text(repo, tmp_path):
     doc = to_document(result(repo), depth="file", explain="Short summary.")
     assert doc["schema_version"] == 1 and doc["ui"] == {"depth": "file"} and doc["explain"] == "Short summary."
@@ -29,6 +36,11 @@ def test_document_shape_and_no_source_text(repo, tmp_path):
     text = path.read_text()
     assert "s3cr3t" not in text and "return id" not in text  # never any code body
     assert json.loads(text)["range"]["label"] == doc["range"]["label"]
+
+
+def test_document_marks_test_modules_files_and_symbols(repo):
+    tests = {n["id"] for n in to_document(python_with_tests(repo))["nodes"] if n["test"]}
+    assert tests == {"module:tests", "file:tests/test_calc.py", "sym:tests/test_calc.py#test_add(0)"}
 
 
 def test_markdown_has_mermaid_styles_and_findings(repo):

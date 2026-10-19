@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from helpers import gradle_project, run_range
+from test_render import python_with_tests
 
 from crgraph.render.html import to_html
 from crgraph.render.jsonout import to_document
@@ -67,6 +68,7 @@ def test_report_renders_in_a_browser(repo, tmp_path):
         page.wait_for_function("window.__crgraph && window.__crgraph.cy().nodes().length > 0")
         assert errors == []
         assert page.locator("#verdict").inner_text().startswith("Size S · Mostly changes to existing code in :core")
+        assert page.locator("#tests-filter").is_hidden()  # nothing to filter
         assert page.locator("#legend[open]").count() == 0  # collapsed: it would cover the graph
         page.locator("#legend summary").click()
         legend = page.locator("#legend").inner_text()
@@ -126,6 +128,31 @@ def test_story_links_open_the_graph_and_are_readable_in_dark_mode(repo, tmp_path
         assert pairs[:2] == ["DT", "DD"] and pairs == ["DT", "DD"] * (len(pairs) // 2)  # labels line up with values
         assert page.locator("#details dl.meta dt").first.inner_text() == "path"
         browser.close()
+
+def test_tests_toggle_hides_test_code_and_comes_back_for_a_search(repo, tmp_path):
+    sync_api = pytest.importorskip("playwright.sync_api")
+    path = tmp_path / "report.html"
+    path.write_text(to_html(to_document(python_with_tests(repo), depth="symbol")))
+    with sync_api.sync_playwright() as p:
+        try:
+            browser = p.chromium.launch(channel="chrome")
+        except Exception:
+            try:
+                browser = p.chromium.launch()
+            except Exception as exc:  # no browser installed
+                pytest.skip(f"no chromium available: {exc}")
+        page = browser.new_page()
+        page.goto(path.as_uri())
+        page.wait_for_function("window.__crgraph && window.__crgraph.cy().nodes().length > 0")
+        ids = "window.__crgraph.cy().nodes().map(n => n.id()).sort()"
+        assert "sym:tests/test_calc.py#test_add(0)" in page.evaluate(ids)
+        page.locator("#tests").uncheck()
+        assert page.evaluate(ids) == ["file:pkg/calc.py", "module:pkg", "sym:pkg/calc.py#add(2)"]
+        page.locator("#search").fill("test_add")
+        page.wait_for_function("document.getElementById('tests').checked")  # a hit inside the tests shows them again
+        assert "sym:tests/test_calc.py#test_add(0)" in page.evaluate(ids)
+        browser.close()
+
 
 def test_symbol_depth_on_a_large_change_shows_the_most_changed_symbols(repo, tmp_path):
     sync_api = pytest.importorskip("playwright.sync_api")

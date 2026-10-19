@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0
+
+- Report: a *Tests* toggle hides test modules, files and symbols in the graph. `delta.json` nodes have a
+  `test` flag.
+
 ## 0.1.0
 
 First public release.
