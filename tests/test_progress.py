@@ -30,3 +30,9 @@ def test_no_output_off_a_terminal_or_when_disabled(monkeypatch):
         assert progress.stream.getvalue() == ""
     monkeypatch.setenv("TERM", "dumb")
     assert not Progress(Terminal()).enabled
+
+
+def test_labels_cannot_write_escape_sequences():
+    progress = Progress(io.StringIO())
+    progress.stage("AI review (m\x1b]0;owned\x07\r\x1b[2Jx)")
+    assert "\x1b" not in progress.line() and "AI review (m]0;owned[2Jx)" in progress.line()

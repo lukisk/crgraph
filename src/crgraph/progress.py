@@ -7,6 +7,7 @@ import shutil
 import sys
 import threading
 import time
+import unicodedata
 from typing import TextIO
 
 FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
@@ -30,6 +31,8 @@ class Progress:
             self._thread.start()
 
     def stage(self, label: str, total: int | None = None) -> None:
+        # labels can carry config values (the model name from a repo's .crgraph.yml): no escape sequences
+        label = "".join(ch for ch in label if not unicodedata.category(ch).startswith("C"))
         with self._lock:
             self.label, self.done, self.total = label, 0, total
         self._draw()
