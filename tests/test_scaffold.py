@@ -2,7 +2,7 @@ import crgraph
 
 
 def test_package_has_version():
-    assert crgraph.__version__ == "0.5.0"
+    assert crgraph.__version__ == "0.5.1"
 
 
 def test_fixture_makes_commits(repo):

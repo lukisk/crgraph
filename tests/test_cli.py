@@ -174,3 +174,12 @@ def test_a_change_cannot_relax_its_own_config(repo, monkeypatch, tmp_path):
     assert main([f"{base}..{head}", "-o", str(tmp_path / "p"), "--format", "json", "--config", str(tmp_path / "c.yml"),
                  "--fail-on", "never"]) == 0
     assert not any(n["id"] == "file:a.py" for n in json.loads((tmp_path / "p" / "delta.json").read_text())["nodes"])
+
+
+def test_quiet_and_non_terminal_runs_show_no_progress(repo, monkeypatch, tmp_path, capsys):
+    repo.commit({"a.py": "def f():\n    return 1\n"})
+    repo.write({"a.py": "def f():\n    return 2\n"})
+    monkeypatch.chdir(repo.root)
+    assert main(["-q", "-o", str(tmp_path / "o"), "--format", "json"]) == 0
+    assert main(["-o", str(tmp_path / "o"), "--format", "json"]) == 0  # stderr is not a terminal under pytest
+    assert "crgraph:" not in capsys.readouterr().err

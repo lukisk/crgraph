@@ -15,6 +15,7 @@ from .graphalg import strongly_connected
 from .model import SEVERITY_RANK, FileFacts, Finding, Graph, GraphDelta, Severity, file_id
 from .modules import ModuleMap, detect_modules
 from .overview import build_overview
+from .progress import QUIET, Progress
 from .resolve import KOTLIN_PACKAGE_GREP, RepoIndex
 
 MAX_NEIGHBOURS_PER_IMPORT = 5
@@ -55,9 +56,11 @@ def _test_code(delta: GraphDelta, patterns: list[str]) -> set[str]:
             if n.path and match_any(patterns, f"{n.path}/_" if n.kind == "module" else n.path)}
 
 
-def run(repo: Repo, rng: RangeSpec, config: Config, pathspecs: list[str] | None = None) -> RunResult:
+def run(repo: Repo, rng: RangeSpec, config: Config, pathspecs: list[str] | None = None,
+        progress: Progress = QUIET) -> RunResult:
     pathspecs = pathspecs or []
     warnings: list[str] = []
+    progress.stage("listing changes")
     all_changes = repo.changed_files(rng, pathspecs)
     changes = [c for c in all_changes if not match_any(config.ignore, c.path)]
     renames = {c.old_path: c.path for c in changes if c.status == "R" and c.old_path}
@@ -75,6 +78,7 @@ def run(repo: Repo, rng: RangeSpec, config: Config, pathspecs: list[str] | None 
         out.update(repo.read_many(rng.head, [p for p in paths if p in selected]))
         return out
 
+    progress.stage("detecting modules")
     mods_before = detect_modules(files_before, lambda paths: repo.read_many(rng.base, paths), config)
     mods_after = detect_modules(files_after, read_after, config)
     index_before = RepoIndex(files_before, mods_before,
@@ -84,24 +88,31 @@ def run(repo: Repo, rng: RangeSpec, config: Config, pathspecs: list[str] | None 
                             lambda: repo.grep_lines(rng.head, KOTLIN_PACKAGE_GREP, ["*.kt", "*.kts"]),
                             config.test_patterns)
 
-    facts_before = parse_files(repo, rng.base, [c.base_path for c in changes if c.base_path])
-    facts_after = parse_files(repo, rng.head, [c.head_path for c in changes if c.head_path])
+    base_paths = [c.base_path for c in changes if c.base_path]
+    head_paths = [c.head_path for c in changes if c.head_path]
+    progress.stage("parsing changed files", len(base_paths) + len(head_paths))
+    facts_before = parse_files(repo, rng.base, base_paths, progress)
+    facts_after = parse_files(repo, rng.head, head_paths, progress)
+    progress.stage("finding impacted files")
     names = changed_symbol_names(facts_before, facts_after, renames)
     extra_paths, warning = find_impacted_files(repo, rng.head, names, set(facts_before) | set(facts_after), config)
     if warning:
         warnings.append(warning)
     parsed = set(facts_before) | set(facts_after)
     extra_paths = sorted(set(extra_paths) | (_import_neighbours(facts_after, index_after, mods_after) - parsed))
-    facts_extra = parse_files(repo, rng.head, extra_paths)
+    progress.stage("parsing impacted files", len(extra_paths))
+    facts_extra = parse_files(repo, rng.head, extra_paths, progress)
     for facts in (facts_before, facts_after, facts_extra):
         warnings += [f"{path}: {f.error}" for path, f in sorted(facts.items()) if f.error]
 
+    progress.stage("building graphs")
     before = build_graph({**facts_extra, **facts_before}, mods_before, index_before)
     after = build_graph({**facts_extra, **facts_after}, mods_after, index_after)
     cyclic = {n for comp in strongly_connected((e.src, e.dst) for e in after.edges if e.kind == "imports") for n in comp}
     delta = compute_delta(before, after, renames, prune_paths={p for p in facts_extra if file_id(p) not in cyclic})
     ctx = AnalysisContext(repo, rng, config, changes, before, after, delta, mods_before, mods_after,
                           facts_before, facts_after)
+    progress.stage("analysing")
     findings = run_analyses(ctx)
     if any(CONFIG_FILE in (c.base_path, c.head_path) for c in all_changes):
         findings.append(Finding("analysis-config", Severity.YELLOW, f"Analysis config changed: {CONFIG_FILE}",

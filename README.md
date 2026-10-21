@@ -34,7 +34,7 @@ pipx install git+https://github.com/lukisk/crgraph
 ```
 
 To upgrade, run `uv tool upgrade crgraph` (or `pipx upgrade crgraph`). To pin a release, append it to the URL:
-`git+https://github.com/lukisk/crgraph@v0.5.0`.
+`git+https://github.com/lukisk/crgraph@v0.5.1`.
 
 Language grammars download on first use. For CI images or offline machines, run `crgraph grammars fetch` once.
 
@@ -185,7 +185,7 @@ crgraph:
     - uses: actions/checkout@v5
       with: { fetch-depth: 0 }
     - uses: astral-sh/setup-uv@v7
-    - run: uv tool install git+https://github.com/lukisk/crgraph@v0.5.0
+    - run: uv tool install git+https://github.com/lukisk/crgraph@v0.5.1
     - run: crgraph origin/${{ github.base_ref }}...HEAD -g --fail-on never
     - run: cat crgraph-out/summary.md >> "$GITHUB_STEP_SUMMARY"
     - uses: actions/upload-artifact@v4
@@ -200,7 +200,7 @@ crgraph:
   rules: [{ if: $CI_MERGE_REQUEST_IID }]
   variables: { GIT_DEPTH: 0 }
   script:
-    - uv tool install git+https://github.com/lukisk/crgraph@v0.5.0
+    - uv tool install git+https://github.com/lukisk/crgraph@v0.5.1
     - ~/.local/bin/crgraph origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD -g --fail-on red
   artifacts: { when: always, paths: [crgraph-out/], expose_as: crgraph report }
 ```
@@ -239,6 +239,7 @@ explain: { model: claude-opus-5-5, include_signatures: true, plain: false }
 | `--config PATH` | use this config file instead of the base revision's `.crgraph.yml` |
 | `--staged` | compare with the index instead of the working tree |
 | `--explain` | add an AI architecture review (see below) |
+| `-q`, `--quiet` | no progress line while crgraph works (it only shows on a terminal, never in CI logs or pipes) |
 | `--version` | print the version |
 
 ### AI architecture review

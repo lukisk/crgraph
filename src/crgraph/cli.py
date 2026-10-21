@@ -20,6 +20,7 @@ from .gitio import GitError, RangeSpec, Repo
 from .lang import GRAMMARS
 from .model import SEVERITY_RANK, Finding, Severity
 from .pipeline import run
+from .progress import Progress
 from .render.html import to_html
 from .render.jsonout import to_document, to_json
 from .render.markdown import to_markdown
@@ -52,6 +53,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="add an AI architecture review (sends names, structure and findings, never code)")
     p.add_argument("--fail-on", choices=["red", "yellow", "never"], default="red", help="exit 1 at this severity")
     p.add_argument("--config", help="config file (default: .crgraph.yml as of the base revision)")
+    p.add_argument("-q", "--quiet", action="store_true",
+                   help="no progress line while working (it is shown only on a terminal anyway)")
     return p
 
 
@@ -106,6 +109,7 @@ def main(argv: list[str] | None = None) -> int:
     if not formats or formats - FORMATS:
         print(f"crgraph: --format must be a comma-separated subset of {', '.join(sorted(FORMATS))}", file=sys.stderr)
         return 2
+    progress = Progress(enabled=False if args.quiet else None)
     try:
         repo = Repo.discover(Path.cwd())
         rng = repo.resolve_range(args.revs, staged=args.staged)
@@ -122,13 +126,15 @@ def main(argv: list[str] | None = None) -> int:
             # the repo under review could plant `crgraph-out` as a link to somewhere we would then write into
             if os.path.realpath(out_abs) != os.path.join(os.path.realpath(repo.root), *Path(rel).parts):
                 raise ConfigError(f"{out} is a symlink inside the repository; use -o with another folder")
-        result = run(repo, rng, config, pathspecs)
+        result = run(repo, rng, config, pathspecs, progress)
         doc = to_document(result, depth=args.depth)
         if args.explain:
+            progress.stage(f"AI review ({config.explain.model})")
             doc["explain"], warning = explain(doc, config.explain)
             doc["review"] = parse_review(doc["explain"])
             if warning:
                 doc["warnings"].append(warning)
+        progress.stage("writing reports")
         out.mkdir(parents=True, exist_ok=True)
         written = []
         if not generate:  # one file per repository, overwritten on every run
@@ -143,15 +149,23 @@ def main(argv: list[str] | None = None) -> int:
         if "html" in formats:
             written.append(write_output(html_path, to_html(doc)))
     except (GitError, ConfigError) as exc:
+        progress.close()
         print(f"crgraph: {exc}", file=sys.stderr)
         return 2
     except tslp.DownloadError as exc:
+        progress.close()
         print(f"crgraph: could not download language grammars ({exc}). "
               "Run 'crgraph grammars fetch' once with network access.", file=sys.stderr)
         return 2
+    except KeyboardInterrupt:
+        progress.close()
+        print("crgraph: interrupted", file=sys.stderr)
+        return 130
     except Exception:  # unexpected: report it, distinct from findings
+        progress.close()
         traceback.print_exc()
         return 3
+    progress.close()
     sev = doc["stats"]["findings"]
     print(f"crgraph {rng.label}: {len(result.changes)} changed path(s), findings 🔴 {sev.get('red', 0)} "
           f"🟡 {sev.get('yellow', 0)} ⚪ {sev.get('info', 0)}")

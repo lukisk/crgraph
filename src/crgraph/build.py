@@ -10,16 +10,18 @@ from .lang import parse_source, plugin_for
 from .lang.base import raw_hash
 from .model import Edge, FileFacts, Graph, Node, Ref, file_id, module_id, sym_id
 from .modules import ModuleMap
+from .progress import QUIET, Progress
 from .resolve import RepoIndex
 
 EDGE_KIND = {"call": "calls", "type": "references", "inherit": "inherits"}
 MAX_CANDIDATES = 3
 
 
-def parse_files(repo: Repo, ref: str, paths: list[str]) -> dict[str, FileFacts]:
+def parse_files(repo: Repo, ref: str, paths: list[str], progress: Progress = QUIET) -> dict[str, FileFacts]:
     """FileFacts for every readable path; files without a language plugin get lang 'other'."""
     facts: dict[str, FileFacts] = {}
     for path, data in repo.read_many(ref, paths).items():
+        progress.advance()
         if data is None:
             continue
         plugin = plugin_for(path)

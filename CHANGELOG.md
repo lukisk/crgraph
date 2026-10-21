@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1
+
+- A progress line on the terminal while crgraph works: the current step, files parsed so far and the elapsed
+  time, so a large range or a slow AI review no longer looks stuck. It is cleared before the summary and never
+  written to pipes or CI logs; `-q`/`--quiet` turns it off.
+
 ## 0.5.0
 
 - Go: functions, methods (grouped under their receiver type), structs, interfaces, constants and imports.
