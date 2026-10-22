@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
 
 - `summary.md` follows `--depth`: with `file` the Mermaid diagram shows changed files grouped by module, with
   `symbol` changed symbols grouped by file, and a table lists every changed file or symbol (status, moves,
