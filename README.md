@@ -71,12 +71,13 @@ directory given with `-o`:
 crgraph main...feature -g                # report.html, summary.md and delta.json in ./crgraph-out/
 crgraph main...feature -o review --open  # write to ./review/ and open the report
 crgraph main...feature --format md       # only summary.md
+crgraph main...feature --format md --depth symbol  # summary.md down to changed symbols
 ```
 
 | File | What it is |
 |---|---|
 | `report.html` | one self-contained interactive page, no network needed |
-| `summary.md` | a Mermaid module diagram and a findings table, ready to paste into a GitHub PR or GitLab MR comment |
+| `summary.md` | a Mermaid diagram and a findings table, ready to paste into a GitHub PR or GitLab MR comment; with `--depth file` or `--depth symbol` the diagram shows files or symbols and a table lists every changed file or symbol (signatures before → after) |
 | `delta.json` | the machine-readable change description (`schema_version: 1`) |
 
 ## The report
@@ -234,7 +235,7 @@ explain: { model: claude-opus-5-5, include_signatures: true, plain: false }
 | `-o DIR`, `--out DIR` | output directory (default `crgraph-out`); implies `--generate` |
 | `--format html,md,json` | which files to write; implies `--generate` |
 | `--open` | with `--generate`, also open the report |
-| `--depth module\|file\|symbol` | how deep the graph starts |
+| `--depth module\|file\|symbol` | how deep the report's graph starts, and how deep `summary.md` goes |
 | `--fail-on red\|yellow\|never` | exit 1 when findings reach this severity (default `red`) |
 | `--config PATH` | use this config file instead of the base revision's `.crgraph.yml` |
 | `--staged` | compare with the index instead of the working tree |

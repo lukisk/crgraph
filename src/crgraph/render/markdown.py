@@ -1,4 +1,5 @@
-"""summary.md: a Mermaid module diagram + findings table, pasteable into a GitLab MR comment."""
+"""summary.md: a Mermaid diagram + findings table, pasteable into a GitLab MR comment. The diagram shows modules,
+files or symbols (the `--depth`); at file and symbol depth a table lists every changed file or symbol."""
 from __future__ import annotations
 
 import re
@@ -19,6 +20,7 @@ GROUP_STYLE = "fill:transparent,stroke:#8c959f,stroke-width:1px,stroke-dasharray
 SEVERITY_ICON = {"red": "🔴", "yellow": "🟡", "info": "⚪"}
 MAX_NODES = 30
 MAX_MODULE_ROWS = 15
+MAX_CHANGE_ROWS = 200  # a GitHub comment holds 65k characters
 MIN_GROUP_SIZE = 2
 LEGEND = ("_Legend: A → B means A depends on B. Thick arrow: new dependency, dotted: removed, red: part of a "
           "finding. Boxes: green added, yellow modified, red removed, purple moved, dashed blue impacted "
@@ -27,8 +29,10 @@ STATUS_ORDER = ["removed", "added", "modified", "moved", "impacted", "unchanged"
 
 
 def _label(text: str) -> str:
-    """Mermaid node label: one line, no quote or backtick that could end the label or the code fence."""
-    return " ".join(text.splitlines()).replace('"', "#quot;").replace("`", "#96;")
+    """Mermaid node label: one line, no quote or backtick that could end the label or the code fence, and no
+    `_`/`*` that Mermaid would read as emphasis (`__init__` would show as a bold "init")."""
+    text = " ".join(text.splitlines()).replace('"', "#quot;").replace("`", "#96;")
+    return text.replace("_", "#95;").replace("*", "#42;")
 
 
 MD_SPECIAL = re.compile(r"([\\`*_\[\]!|~])")  # emphasis, code, links/images, tables, strikethrough
@@ -53,7 +57,9 @@ def _counts(bucket: dict[str, int]) -> str:
     return ", ".join(parts) or "no changes"
 
 
-def mermaid(doc: dict[str, Any]) -> list[str]:
+def mermaid(doc: dict[str, Any], depth: str = "module") -> list[str]:
+    if depth != "module":
+        return _detail_mermaid(doc, depth)
     modules = {n["id"]: n for n in doc["nodes"] if n["kind"] == "module"}
     keep = {mid for mid, n in modules.items() if n["status"] != "unchanged"}
     if not keep:
@@ -92,6 +98,132 @@ def mermaid(doc: dict[str, Any]) -> list[str]:
     lines += [f"  style {gid} {GROUP_STYLE}" for gid in groups]
     lines += [f"  linkStyle {i} stroke:#d04545,stroke-width:3px" for i, link in enumerate(links) if link[3]]
     return lines
+
+
+def _qualified(n: dict[str, Any], nodes: dict[str, dict[str, Any]]) -> str:
+    """A symbol with the types it sits in: `Repo.load`."""
+    names = [n["name"]]
+    parent = nodes.get(n.get("parent") or "")
+    while parent is not None and parent["kind"] not in ("module", "file"):
+        names.append(parent["name"])
+        parent = nodes.get(parent.get("parent") or "")
+    return ".".join(reversed(names))
+
+
+def _detail_mermaid(doc: dict[str, Any], depth: str) -> list[str]:
+    """Files grouped by module, or symbols grouped by file; edges lifted to that level."""
+    nodes = {n["id"]: n for n in doc["nodes"]}
+
+    def at_level(nid: str) -> str | None:
+        """The file a node is in (file depth), or the symbol itself (symbol depth)."""
+        n = nodes.get(nid)
+        if n is None or n["kind"] == "module" or (depth == "symbol" and n["kind"] == "file"):
+            return None
+        while depth == "file" and n is not None and n["kind"] != "file":
+            n = nodes.get(n.get("parent") or "")
+        return n["id"] if n is not None else None
+
+    def group_of(nid: str) -> str | None:
+        parent = nodes.get(nodes[nid].get("parent") or "")
+        while parent is not None and parent["kind"] != ("module" if depth == "file" else "file"):
+            parent = nodes.get(parent.get("parent") or "")
+        return parent["id"] if parent is not None else None
+
+    items = {nid for nid in nodes if at_level(nid) == nid}
+    keep = {nid for nid in items if nodes[nid]["status"] != "unchanged"}
+    if not keep:
+        return ["flowchart LR", f'  none["no {depth}-level changes"]']
+    red = {t for f in doc["findings"] if f["severity"] == "red" for t in f["targets"]}
+    pairs: dict[tuple[str, str], tuple[str, bool]] = {}
+    for e in doc["edges"]:
+        src, dst = at_level(e["src"]), at_level(e["dst"])
+        if src is None or dst is None or src == dst or not ({src, dst} & keep):
+            continue
+        is_red = f"{e['src']}->{e['dst']}:{e['kind']}" in red
+        old = pairs.get((src, dst))
+        # one arrow per pair: a kept or added edge wins over a removed one
+        status = e["status"] if old is None or old[0] == "removed" or e["status"] == "added" else old[0]
+        pairs[(src, dst)] = (status, is_red or (old is not None and old[1]))
+    neighbours = {x for pair in pairs for x in pair} - keep
+    ordered = sorted(keep, key=lambda i: (STATUS_ORDER.index(nodes[i]["status"]), i)) + sorted(neighbours)
+    shown = ordered[:MAX_NODES]
+    alias = {nid: f"n{i}" for i, nid in enumerate(shown)}
+    groups: dict[str | None, list[str]] = {}
+    for nid in shown:
+        groups.setdefault(group_of(nid), []).append(nid)
+
+    def label(nid: str) -> str:
+        n = nodes[nid]
+        return n["path"].rpartition("/")[2] if n["kind"] == "file" else _qualified(n, nodes)
+
+    lines = ["flowchart LR"]
+    for i, (gid, members) in enumerate(sorted(groups.items(), key=lambda g: g[0] or "")):
+        if gid is None:
+            lines += [_node(alias[nid], label(nid), nodes[nid]["status"]) for nid in members]
+            continue
+        group = nodes[gid]
+        lines.append(f'  subgraph g{i}["{_label(group["name"] if group["kind"] == "module" else group["path"])}"]')
+        lines += [f"  {_node(alias[nid], label(nid), nodes[nid]['status'])}" for nid in members]
+        lines += ["  end", f"  style g{i} {GROUP_STYLE}"]
+    links = [(src, dst, status, is_red) for (src, dst), (status, is_red) in sorted(pairs.items())
+             if src in alias and dst in alias]
+    for src, dst, status, _ in links:
+        arrow = {"removed": "-.->", "added": "==>"}.get(status, "-->")
+        lines.append(f"  {alias[src]} {arrow} {alias[dst]}")
+    hidden = len(ordered) - len(shown)
+    if hidden:
+        lines.append(f'  more["+{hidden} more {depth}s"]')
+    lines += [f"  classDef {status} {style}" for status, style in STATUS_STYLE.items()]
+    lines += [f"  linkStyle {i} stroke:#d04545,stroke-width:3px" for i, link in enumerate(links) if link[3]]
+    return lines
+
+
+def _table_code(text: str) -> str:
+    """A code span in a table cell: GitHub and GitLab split cells on `|` even inside code."""
+    return _code(text).replace("|", "\\|")
+
+
+def _signature(n: dict[str, Any]) -> str:
+    before, after = n.get("signature_before"), n.get("signature_after")
+    if before and after and before != after:
+        return f"{_table_code(before)} → {_table_code(after)}"
+    return _table_code(after or before) if after or before else "—"
+
+
+def changes(doc: dict[str, Any], depth: str) -> list[str]:
+    """Every changed file (file depth) or symbol (symbol depth), grouped by module."""
+    if depth == "module":
+        return []
+    nodes = {n["id"]: n for n in doc["nodes"]}
+    kinds = {"file"} if depth == "file" else {k for k in (n["kind"] for n in doc["nodes"]) if k not in ("module", "file")}
+    rows = sorted((n for n in doc["nodes"] if n["kind"] in kinds and n["status"] != "unchanged"),
+                  key=lambda n: (n.get("module") or "", STATUS_ORDER.index(n["status"]), n.get("path") or "", n["id"]))
+    if not rows:
+        return []
+    out = [f"### Changed {depth}s", ""]
+    if depth == "file":
+        out += ["| Module | File | Status | Symbols |", "|---|---|---|---|"]
+        symbols: dict[str, dict[str, int]] = {}
+        for n in doc["nodes"]:
+            if n["kind"] not in ("module", "file") and n.get("path"):
+                bucket = symbols.setdefault(n["path"], {"added": 0, "removed": 0, "modified": 0, "moved": 0})
+                if n["status"] in bucket:
+                    bucket[n["status"]] += 1
+    else:
+        out += ["| Module | Symbol | Kind | Status | Signature |", "|---|---|---|---|---|"]
+    for n in rows[:MAX_CHANGE_ROWS]:
+        module = _cell(n["module"]) if n.get("module") else "—"
+        status = n["status"] + (f" from {_table_code(n['from_path'])}" if n.get("from_path") else "")
+        test = " (test)" if n.get("test") else ""
+        if depth == "file":
+            counts = symbols.get(n["path"], {"added": 0, "removed": 0, "modified": 0, "moved": 0})
+            out.append(f"| {module} | {_table_code(n['path'])}{test} | {status} | {_symbols(counts)} |")
+        else:
+            where = f"{_table_code(_qualified(n, nodes))}{test}<br>{_cell(n['path'] or '')}"
+            out.append(f"| {module} | {where} | {n['kind']} | {status} | {_signature(n)} |")
+    if len(rows) > MAX_CHANGE_ROWS:
+        out.append(f"| +{len(rows) - MAX_CHANGE_ROWS} more {depth}s |{' |' * (3 if depth == 'file' else 4)}")
+    return [*out, ""]
 
 
 def _node(node_alias: str, name: str, status: str) -> str:
@@ -199,7 +331,8 @@ def review(doc: dict[str, Any]) -> list[str]:
     return out
 
 
-def to_markdown(doc: dict[str, Any]) -> str:
+def to_markdown(doc: dict[str, Any], depth: str | None = None) -> str:
+    depth = depth or doc.get("ui", {}).get("depth", "module")
     st = doc["stats"]
     sev = st["findings"]
     out = [f"## crgraph · {_code(doc['range']['label'])}", ""]
@@ -207,7 +340,8 @@ def to_markdown(doc: dict[str, Any]) -> str:
     out.append(f"**Modules:** {_counts(st['modules'])} · **Files:** {_counts(st['files'])} · "
                f"**Symbols:** {_counts(st['symbols'])} · **Findings:** 🔴 {sev.get('red', 0)} "
                f"🟡 {sev.get('yellow', 0)} ⚪ {sev.get('info', 0)}")
-    out += ["", *overview(doc.get("overview") or {}), "```mermaid", *mermaid(doc), "```", LEGEND, ""]
+    out += ["", *overview(doc.get("overview") or {}), "```mermaid", *mermaid(doc, depth), "```", LEGEND, "",
+            *changes(doc, depth)]
     if doc["findings"]:
         out += ["| | Rule | Finding |", "|---|---|---|"]
         out += [f"| {SEVERITY_ICON[f['severity']]} | {f['rule']} | {_cell(f['title'])} |" for f in doc["findings"]]

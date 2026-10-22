@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- `summary.md` follows `--depth`: with `file` the Mermaid diagram shows changed files grouped by module, with
+  `symbol` changed symbols grouped by file, and a table lists every changed file or symbol (status, moves,
+  symbol counts, signatures before → after, test code marked). The default `module` output is unchanged.
+- Progress labels drop control characters: the AI review label shows the model name, which a repository's
+  `.crgraph.yml` can set.
+
 ## 0.5.1
 
 - A progress line on the terminal while crgraph works: the current step, files parsed so far and the elapsed

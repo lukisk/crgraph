@@ -150,3 +150,30 @@ def test_markdown_shows_the_review_as_a_verdict_and_table():
     assert "| Aspect | Assessment |" in md and "| DRY | no \\*duplication\\* |" in md
     plain = to_markdown({**base, "explain": "Free text.", "review": None})
     assert "Free text." in plain and "Aspect" not in plain
+
+
+def test_markdown_at_file_and_symbol_depth_lists_what_changed(repo):
+    doc = to_document(result(repo))
+    assert "### Changed" not in to_markdown(doc)  # module depth: as before
+    files = to_markdown(doc, "file")
+    assert '"Repo.kt"):::modified' in files and 'subgraph g' in files
+    assert "| :core | `core/src/Repo.kt` | modified | ~2 |" in files
+    symbols = to_markdown(to_document(result(repo), depth="symbol"))  # the document's depth is the default
+    assert '"Repo.load"):::modified' in symbols and '"Repo.kt"' not in symbols.split("```")[1]
+    assert ("| :core | `Repo.load`<br>core/src/Repo.kt | function | modified | "
+            "`fun load(id: Int): Int` → `fun load(id: Long): Int` |") in symbols
+
+
+def test_change_tables_keep_pipes_and_names_inside_their_cell():
+    nodes = [{"id": "module:m", "kind": "module", "name": "m", "status": "modified", "parent": None, "path": "m"},
+             {"id": "file:m/a|b.py", "kind": "file", "name": "a|b.py", "status": "modified", "parent": "module:m",
+              "path": "m/a|b.py", "module": "m"},
+             {"id": "sym:m/a|b.py#f(1)", "kind": "function", "name": "f", "status": "modified", "parent": "file:m/a|b.py",
+              "path": "m/a|b.py", "module": "m", "signature_before": "def f(x: int)",
+              "signature_after": "def f(x: int | None)"}]
+    doc = {"range": {"label": "a..b"}, "stats": {"modules": {}, "files": {}, "symbols": {}, "findings": {}},
+           "nodes": nodes, "edges": [], "findings": [], "warnings": [], "explain": None}
+    assert "| m | `m/a\\|b.py` | modified | ~1 |" in to_markdown(doc, "file")
+    assert "`def f(x: int)` → `def f(x: int \\| None)` |" in to_markdown(doc, "symbol")
+    nodes[2]["name"] = "__init__"
+    assert '("#95;#95;init#95;#95;"):::modified' in to_markdown(doc, "symbol")

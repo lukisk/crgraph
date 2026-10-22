@@ -48,7 +48,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-o", "--out", help=f"output directory (default: {DEFAULT_OUT}); implies --generate")
     p.add_argument("--format", help=f"comma-separated: html, md, json (default: {DEFAULT_FORMATS}); implies --generate")
     p.add_argument("--open", action="store_true", help="with --generate: also open report.html in the browser")
-    p.add_argument("--depth", choices=["module", "file", "symbol"], default="module", help="initial graph depth")
+    p.add_argument("--depth", choices=["module", "file", "symbol"], default="module",
+                   help="how deep report.html's graph starts and summary.md goes: "
+                        "file and symbol add a diagram and a table of every changed file or symbol")
     p.add_argument("--explain", action="store_true",
                    help="add an AI architecture review (sends names, structure and findings, never code)")
     p.add_argument("--fail-on", choices=["red", "yellow", "never"], default="red", help="exit 1 at this severity")
